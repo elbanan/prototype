@@ -230,7 +230,7 @@ class DICOMProcessor(Dataset):
     def __getitem__(self, idx):
         P = self.table.iloc[idx][self.path_col]
         L = self.table.iloc[idx][self.label_col]
-        L_id = self.classes[L]
+        L_id = self.class_to_idx[L]
         if self.ext != 'dcm':
             img=Image.open(P)
         else:
