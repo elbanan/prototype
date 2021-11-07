@@ -23,7 +23,7 @@ from sklearn.utils import resample
 from torch.utils.model_zoo import load_url
 from torchinfo import summary
 
-from const import *
+from .const import *
 
 
 class Identity(nn.Module):
