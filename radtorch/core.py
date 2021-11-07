@@ -98,9 +98,12 @@ class DICOMDataset():
             return output
 
     def view_batch(self, data='train', figsize = (25,5), rows=2, batch_size=16, shuffle=True, num_images=None):
-        self.loaders = self.get_loaders(batch_size=batch_size, shuffle=shuffle)
+        # self.loaders = self.get_loaders(batch_size=batch_size, shuffle=shuffle)
+        loader = DICOMProcessor(root=self.root, ext=self.ext, table=self.data_table[data], path_col=self.path_col, label_col=self.label_col, transform=self.transforms[data], \
+        HU=self.HU, window=self.window, level=self.level).get_loaders(batch_size=batch_size, shuffle=shuffle)
+        # idx, images, labels  = (iter(self.loaders[data])).next()
+        idx, images, labels  = (iter(loader)).next()
 
-        idx, images, labels  = (iter(self.loaders[data])).next()
         images = images.numpy()
         batch = images.shape[0]
         if num_images:
@@ -115,7 +118,8 @@ class DICOMDataset():
                 plt.imshow(np.transpose(img, (1, 2, 0)))
             elif images[idx].shape[0] ==1:
                 ax.imshow(np.squeeze(images[idx]), cmap='gray')
-            label = next((k for k, v in self.class_to_idx.items() if v == labels[idx]), None)
+            label = list(self.class_to_idx.keys())[list(self.class_to_idx.values()).index(idx)]
+            # label = next((k for k, v in self.class_to_idx.items() if v == labels[idx]), None)
             ax.set_title(label)
 
     def header_info(self, data='train', limit=10):
