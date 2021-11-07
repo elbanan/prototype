@@ -94,16 +94,16 @@ class DICOMDataset():
         else:
             output = {}
             for k, v in self.data_table.items():
-                output[k] = DICOMProcessor(root=self.root, ext=self.ext, table=v, path_col=self.path_col, label_col=self.label_col, transform=self.transforms[k], HU=self.HU, window=self.window, level=self.level).get_loaders(batch_size=batch_size, shuffle=shuffle)
+                output[k] = DICOMProcessor(root=self.root, ext=self.ext, table=v, class_to_idx = self.class_to_idx, path_col=self.path_col, label_col=self.label_col, transform=self.transforms[k], HU=self.HU, window=self.window, level=self.level).get_loaders(batch_size=batch_size, shuffle=shuffle)
             return output
 
     def view_batch(self, data='train', figsize = (25,5), rows=2, batch_size=16, shuffle=False, num_images=None):
-        loader = DICOMProcessor(root=self.root, ext=self.ext, table=self.data_table[data], path_col=self.path_col, label_col=self.label_col, transform=self.transforms[data], \
+        loader = DICOMProcessor(root=self.root, ext=self.ext, table=self.data_table[data], class_to_idx = self.class_to_idx, path_col=self.path_col, label_col=self.label_col, transform=self.transforms[data], \
         HU=self.HU, window=self.window, level=self.level).get_loaders(batch_size=batch_size, shuffle=shuffle)
         uidx, images, labels  = (iter(loader)).next()
 
         images = images.cpu().numpy()
-        labels = labels.cpu().numpy().tolist()
+        labels = labels.cpu().numpy()
 
         batch = images.shape[0]
 
@@ -119,15 +119,14 @@ class DICOMDataset():
             ax = fig.add_subplot(rows, int(batch/rows), i+1, xticks=[], yticks=[])
 
             if images[i].shape[0] == 3:
-                img = images[i]
-                img = img / 2 + 0.5
-                ax.imshow(np.transpose(img, (1, 2, 0)))
+                # img = images[i]
+                # img = img / 2 + 0.5
+                ax.imshow(np.transpose(images[i], (1, 2, 0)))
 
             elif images[i].shape[0] ==1:
                 ax.imshow(np.squeeze(images[i]), cmap='gray')
 
-            label = self.classes[labels[i]]
-            ax.set_title(label)
+            ax.set_title(self.classes[labels[i]])
 
     def header_info(self, data='train', limit=10):
         table = self.data_table[data]
