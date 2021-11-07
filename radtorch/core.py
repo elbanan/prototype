@@ -560,10 +560,14 @@ class FeatureExtractor():
         batch_size, channels, img_dim, img_dim = batch.shape
         return model_info(self.model, list=False, batch_size=batch_size, channels=channels, img_dim=img_dim)
 
-    def hybrid_table(self, sklearn_ready=False):
+    def hybrid_table(self, sklearn_ready=False, label_id=True):
         h = pd.merge(self.features, self.dataset.data_table['train'], on='uid')
+        h['label_id'] = [self.dataset.class_to_idx[r[self.dataset.label_col]] for i, r in h.iterrows()]
         if sklearn_ready:
-            f, l = self.features[self.feature_names], h[self.dataset.label_col]
+            if label_id:
+                f, l = self.features[self.feature_names], h['label_id']
+            else:
+                f, l = self.features[self.feature_names], h[self.dataset.label_col]
             return f, l
         else:
             return h
