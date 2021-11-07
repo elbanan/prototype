@@ -262,7 +262,7 @@ class ImageClassifier():
         classes = self.loaders['train'].dataset.classes
         return dict(zip(classes, [i for i in range(0,len(classes))]))
 
-    def fit(self, epochs=20, valid=True, verbose_level=('epoch', 1), output_model='trained_model.pt'):
+    def fit(self, epochs=20, valid=True, verbose_level=('epoch', 1), output_model='best_model.pt'):
         self.valid_loss_min = np.Inf
         print ("Starting model training on "+str(self.device))
         self.training_model = deepcopy(self.model)
@@ -402,7 +402,7 @@ class Metrics():
 
         true_labels = []
         pred_labels = []
-        for i, (imgs, labels) in tqdm(enumerate(self.classifier.loaders[target_loader]), total=len(self.classifier.loaders[target_loader])):
+        for i, (idx, imgs, labels) in tqdm(enumerate(self.classifier.loaders[target_loader]), total=len(self.classifier.loaders[target_loader])):
             imgs, labels = imgs.to(self.device), labels.to(self.device)
             true_labels = true_labels+labels.tolist()
             with torch.no_grad():
@@ -427,7 +427,7 @@ class Metrics():
 
         with torch.no_grad():
             test_model.eval()
-            for data, target in self.classifier.loaders['test']:
+            for idx, data, target in self.classifier.loaders['test']:
                 data, target = data.to(self.device), target.to(self.device)
                 output = test_model(data)
                 loss = self.classifier.criterion(output, target)
@@ -512,6 +512,7 @@ class FeatureExtractor():
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.model = grab_pytorch_model(model_arch=self.model_arch, pretrained=True)
         self.model = remove_last_layers(model=self.model, model_arch=self.model_arch)
+        self.model = self.model.to(self.device)
 
     def run(self, batch_size=16):
         self.batch_size= batch_size
@@ -528,10 +529,9 @@ class FeatureExtractor():
                 else:
                     features = torch.cat((features,output), 0)
                     uid_list = torch.cat((uid_list, uid), 0)
-        self.features = pd.DataFrame(features.numpy())
+        self.features = pd.DataFrame(features.cpu().numpy())
         self.features['uid'] = uid_list.numpy()
         self.feature_names = self.features.columns.tolist()[:-1]
-
 
     def num_features(self):
         return self.features.shape[1]
@@ -573,7 +573,6 @@ class Inference():
         if specific_transform:self.transforms=specific_transform
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-
     def predict(self, img_path, top_predictions='all', display_image=False, human=True):
         if top_predictions == 'all':
             top = len(self.ds.classes)
@@ -611,8 +610,10 @@ class Inference():
 
         if display_image:
             if ext != '.dcm':
+                plt.grid(False)
                 plt.imshow(mpimg.imread(img_path))
             else:
+                plt.grid(False)
                 plt.imshow((pydicom.dcmread(img_path).pixel_array), cmap='gray');
 
         if human:
