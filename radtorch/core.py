@@ -110,15 +110,15 @@ class DICOMDataset():
             if num_images > batch:print('Warning: Selected number of images is less than batch size. Displaying a batch instead.')
             else:batch = num_images
         fig = plt.figure(figsize=figsize)
-        for idx in np.arange(batch):
-            ax = fig.add_subplot(rows, int(batch/rows), idx+1, xticks=[], yticks=[])
-            if images[idx].shape[0] == 3:
-                img = images[idx]
+        for i in np.arange(batch):
+            ax = fig.add_subplot(rows, int(batch/rows), i+1, xticks=[], yticks=[])
+            if images[i].shape[0] == 3:
+                img = images[i]
                 img = img / 2 + 0.5
                 plt.imshow(np.transpose(img, (1, 2, 0)))
-            elif images[idx].shape[0] ==1:
-                ax.imshow(np.squeeze(images[idx]), cmap='gray')
-            label = list(self.class_to_idx.keys())[list(self.class_to_idx.values()).index(idx)]
+            elif images[i].shape[0] ==1:
+                ax.imshow(np.squeeze(images[i]), cmap='gray')
+            label = list(self.class_to_idx.keys())[list(self.class_to_idx.values()).index(i)]
             # label = next((k for k, v in self.class_to_idx.items() if v == labels[idx]), None)
             ax.set_title(label)
 
