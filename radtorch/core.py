@@ -118,7 +118,8 @@ class DICOMDataset():
                 plt.imshow(np.transpose(img, (1, 2, 0)))
             elif images[i].shape[0] ==1:
                 ax.imshow(np.squeeze(images[i]), cmap='gray')
-            label = list(self.class_to_idx.keys())[list(self.class_to_idx.values()).index(i)]
+            # label = list(self.class_to_idx.keys())[list(self.class_to_idx.values()).index(labels[i])]
+            label = self.classes[labels.cpu().numpy().tolist()[i]]
             # label = next((k for k, v in self.class_to_idx.items() if v == labels[idx]), None)
             ax.set_title(label)
 
