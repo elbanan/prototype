@@ -97,30 +97,36 @@ class DICOMDataset():
                 output[k] = DICOMProcessor(root=self.root, ext=self.ext, table=v, path_col=self.path_col, label_col=self.label_col, transform=self.transforms[k], HU=self.HU, window=self.window, level=self.level).get_loaders(batch_size=batch_size, shuffle=shuffle)
             return output
 
-    def view_batch(self, data='train', figsize = (25,5), rows=2, batch_size=16, shuffle=True, num_images=None):
-        # self.loaders = self.get_loaders(batch_size=batch_size, shuffle=shuffle)
+    def view_batch(self, data='train', figsize = (25,5), rows=2, batch_size=16, shuffle=False, num_images=None):
         loader = DICOMProcessor(root=self.root, ext=self.ext, table=self.data_table[data], path_col=self.path_col, label_col=self.label_col, transform=self.transforms[data], \
         HU=self.HU, window=self.window, level=self.level).get_loaders(batch_size=batch_size, shuffle=shuffle)
-        # idx, images, labels  = (iter(self.loaders[data])).next()
-        idx, images, labels  = (iter(loader)).next()
+        uidx, images, labels  = (iter(loader)).next()
 
-        images = images.numpy()
+        images = images.cpu().numpy()
+        labels = labels.cpu().numpy().tolist()
+
         batch = images.shape[0]
+
         if num_images:
-            if num_images > batch:print('Warning: Selected number of images is less than batch size. Displaying a batch instead.')
-            else:batch = num_images
+            if num_images > batch:
+                print('Warning: Selected number of images is less than batch size. Displaying a batch instead.')
+            else:
+                batch = num_images
+
         fig = plt.figure(figsize=figsize)
+
         for i in np.arange(batch):
             ax = fig.add_subplot(rows, int(batch/rows), i+1, xticks=[], yticks=[])
+
             if images[i].shape[0] == 3:
                 img = images[i]
                 img = img / 2 + 0.5
-                plt.imshow(np.transpose(img, (1, 2, 0)))
+                ax.imshow(np.transpose(img, (1, 2, 0)))
+
             elif images[i].shape[0] ==1:
                 ax.imshow(np.squeeze(images[i]), cmap='gray')
-            # label = list(self.class_to_idx.keys())[list(self.class_to_idx.values()).index(labels[i])]
-            label = self.classes[labels.cpu().numpy().tolist()[i]]
-            # label = next((k for k, v in self.class_to_idx.items() if v == labels[idx]), None)
+
+            label = self.classes[labels[i]]
             ax.set_title(label)
 
     def header_info(self, data='train', limit=10):
@@ -223,24 +229,28 @@ class DICOMProcessor(Dataset):
         return len(self.table)
 
     def __getitem__(self, idx):
+        P = self.table.iloc[idx][self.path_col]
+        L = self.table.iloc[idx][self.label_col]
+        L_id = self.classes[L]
         if self.ext != 'dcm':
-            img=Image.open(self.table.iloc[idx][self.path_col])
+            img=Image.open(P)
         else:
             if self.multilevelwindow:
-                i = self.table.iloc[idx][self.label_col]
-                w = self.window[i]
-                l = self.level[i]
-                img=dicom_to_array(filepath=self.table.iloc[idx][self.path_col], HU=self.HU, window=w, level=l)
+                w = self.window[L]
+                l = self.level[L]
+                img=dicom_to_array(filepath=P, HU=self.HU, window=w, level=l)
             else:
-                img=dicom_to_array(filepath=self.table.iloc[idx][self.path_col], HU=self.HU, window=self.window, level=self.level)
+                img=dicom_to_array(filepath=P, HU=self.HU, window=self.window, level=self.level)
             img=dicom_array_to_pil(img)
         if self.transforms:
             img=self.transforms(img)
         try:
             uid = self.table.iloc[idx]['uid']
         except:
-            uid = self.table.iloc[idx][self.path_col]
-        return  uid, img, [v for k, v in self.class_to_idx.items() if k == self.table.iloc[idx][self.label_col]][0]
+            uid = P
+        # return  uid, img, [v for k, v in self.class_to_idx.items() if k == self.table.iloc[idx][self.label_col]][0]
+        return  uid, img, L_id
+
 
     def get_loaders(self, batch_size=16, shuffle=True):
         return torch.utils.data.DataLoader(self, batch_size=batch_size, shuffle=shuffle)
