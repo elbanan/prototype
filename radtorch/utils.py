@@ -146,36 +146,6 @@ def show_values_on_bars(axs):
     else:
         _show_on_single_plot(axs)
 
-def dicom_to_array(filepath, HU=False, window=None, level=None):
-    dcm_info =  pydicom.read_file(filepath)
-    if HU:
-        try:
-            hu_img = dcm_info.pixel_array*dcm_info.RescaleSlope + dcm_info.RescaleIntercept
-            return hu_img.astype(float)
-        except:
-            raise ValueError('File {:} could not be converted to HU. Please check that modality is CT and DICOM header contains RescaleSlope and RescaleIntercept.'.format(filepath))
-    elif window:
-        if len(window) != 1:
-            raise ValueError('Argument "wl" can only accept 1 combination of W and L when "WIN" mode is selected')
-        try:
-            img = dcm_info.pixel_array*dcm_info.RescaleSlope + dcm_info.RescaleIntercept # try to convert to HU before windowing
-        except:
-            img = dcm_info.pixel_array
-        lower = level - (width / 2)
-        upper = level + (width / 2)
-        img[img<=lower] = lower
-        img[img>=upper] = upper
-        return img.astype(float)
-    else:
-        return dcm_info.pixel_array.astype(float)
-
-def dicom_array_to_pil(pixel_array, mode=None):
-    img = Image.fromarray(pixel_array)
-    if mode:
-        return img.convert(mode)
-    else:
-        return img
-
 def calculate_mean_std(dataloader):
     '''
     Source
@@ -218,10 +188,46 @@ def remove_last_layers(model, model_arch):
     elif 'inception' in model_arch: model.fc = Identity()
     return model
 
-
 def model_info(model, list=False, batch_size=1, channels=3, img_dim=224):
     if isinstance(model, str): model = eval('models.'+model+ "()")
     if list:
         return list(model.named_children())
     else:
         return summary(model, input_size=(batch_size, channels, img_dim, img_dim), depth=channels, col_names=["input_size", "output_size", "num_params"],)
+
+def wl_array(array, w, l):
+    lower = l - (w / 2)
+    upper = l + (w / 2)
+    w_img = array.copy()
+    w_img[w_img<=lower] = lower
+    w_img[w_img>=upper] = upper
+    return w_img.astype(float)
+
+def dicom_to_hu(img_path):
+    dcm_data = pydicom.read_file(img_path)
+    p = dcm_data.pixel_array
+    s = dcm_data.RescaleSlope
+    i = dcm_data.RescaleIntercept
+    return (p*s+i)
+
+def dicom_handler(img_path, modality, num_output_channels=1, w=None, l=None):
+    dcm_data = pydicom.read_file(img_path)
+    if modality == 'CT':
+        if all(i!=None for i in [w, l]):
+            img = dicom_to_hu(img_path)
+            if num_output_channels == 1:
+                img = wl_array(img, w, l)
+            else:
+                if num_output_channels > 3:
+                    raise ValueError('Only 1 or 3 channels is supported.')
+                channels = []
+                for c in range(num_output_channels):
+                    channels.append(wl_array(img, w=w[c], l=l[c]).astype('uint8'))
+                img = np.dstack(channels)
+                img = Image.fromarray(img, "RGB")
+        else:
+            img = Image.fromarray(dcm_data.pixel_array)
+
+    else:
+        img = Image.fromarray(dcm_data.pixel_array)
+    return img
