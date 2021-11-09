@@ -68,3 +68,9 @@ CT_window_level = {  #https://radiopaedia.org/articles/windowing-ct?lang=us
 "spine_soft": {"window":250, "level":50},
 "spine_bone": {"window":1800, "level":400},
 }
+
+imagenet_mean = (0.485, 0.456, 0.406) #https://github.com/pytorch/vision/issues/1439
+imagenet_std = (0.229, 0.224, 0.225) #https://github.com/pytorch/vision/issues/1439
+
+norm_mean = (0.5, 0.5, 0.5)
+norm_std = (0.5, 0.5, 0.5)

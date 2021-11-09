@@ -144,9 +144,10 @@ class DICOMDataset():
         num_channels = img.shape[0]
         fig = plt.figure(figsize=figsize)
         img = np.transpose(img, (1, 2, 0))
-        channels=[]
-        for i in range(0,num_channels):
-            channels.append(img[:, :, i])
+        
+        channels=[img[:,:,i] for i in range (0, num_channels)]
+        # for i in range(0,num_channels):
+        #     channels.append(img[:, :, i])
 
         for i in range(0, num_channels):
             ax = fig.add_subplot(1, num_channels, i+1, xticks=[], yticks=[])
@@ -256,7 +257,7 @@ class DICOMProcessor(Dataset):
         if self.ext != 'dcm':
             img=Image.open(P)
         else:
-            img = dicom_handler(img_path=P, modality=self.modality, num_output_channels=self.num_output_channels, w=self.window, l=self.level)
+            img = dicom_handler(img_path=P, modality=self.modality, num_output_channels=self.num_output_channels, WW=self.window, WL=self.level)
         if self.transforms:
             img=self.transforms(img)
         try:

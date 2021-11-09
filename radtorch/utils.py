@@ -22,6 +22,7 @@ from collections import OrderedDict
 from sklearn.utils import resample
 from torch.utils.model_zoo import load_url
 from torchinfo import summary
+from matplotlib import cm
 
 from .const import *
 
@@ -195,13 +196,13 @@ def model_info(model, list=False, batch_size=1, channels=3, img_dim=224):
     else:
         return summary(model, input_size=(batch_size, channels, img_dim, img_dim), depth=channels, col_names=["input_size", "output_size", "num_params"],)
 
-def wl_array(array, w, l):
-    lower = l - (w / 2)
-    upper = l + (w / 2)
-    w_img = array.copy()
-    w_img[w_img<=lower] = lower
-    w_img[w_img>=upper] = upper
-    return w_img.astype(float)
+def wl_array(array, WW, WL):
+    upper, lower = WL+WW//2, WL-WW//2
+    X = np.clip(array.copy(), lower, upper)
+    X = X - np.min(X)
+    X = X / np.max(X)
+    X = (X*255.0).astype('uint8')
+    return X
 
 def dicom_to_hu(img_path):
     dcm_data = pydicom.read_file(img_path)
@@ -210,21 +211,31 @@ def dicom_to_hu(img_path):
     i = dcm_data.RescaleIntercept
     return (p*s+i)
 
-def dicom_handler(img_path, modality, num_output_channels=1, w=None, l=None):
+def Normalize_0_1(array):
+    return (array - np.min(array)) / (np.max(array) - np.min(array))
+
+def Normalize_255(array):
+    # return array/(array.max()/255.0)
+    return (255*(array - np.min(array))/np.ptp(array)).astype(int)
+
+def Normalize_1_1(array):
+    return 2.*(array - np.min(array))/np.ptp(array)-1
+
+def dicom_handler(img_path, modality, num_output_channels=1, WW=None, WL=None):
     dcm_data = pydicom.read_file(img_path)
     if modality == 'CT':
-        if all(i!=None for i in [w, l]):
+        if all(i!=None for i in [WW, WL]):
             img = dicom_to_hu(img_path)
             if num_output_channels == 1:
-                img = wl_array(img, w, l)
+                img = wl_array(img, WW, WL)
             else:
                 if num_output_channels > 3:
                     raise ValueError('Only 1 or 3 channels is supported.')
                 channels = []
                 for c in range(num_output_channels):
-                    channels.append(wl_array(img, w=w[c], l=l[c]).astype('uint8'))
-                img = np.dstack(channels)
-                img = Image.fromarray(img, "RGB")
+                    channels.append(wl_array(img, WW=WW[c], WL=WL[c]))
+                img = Image.fromarray(np.dstack(channels))
+
         else:
             img = Image.fromarray(dcm_data.pixel_array)
 
