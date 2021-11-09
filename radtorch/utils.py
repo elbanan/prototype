@@ -227,7 +227,7 @@ def dicom_handler(img_path, modality, num_output_channels=1, WW=None, WL=None):
         if all(i!=None for i in [WW, WL]):
             img = dicom_to_hu(img_path)
             if num_output_channels == 1:
-                img = wl_array(img, WW, WL)
+                img = Image.fromarray(wl_array(img, WW, WL))
             else:
                 if num_output_channels > 3:
                     raise ValueError('Only 1 or 3 channels is supported.')
@@ -237,8 +237,9 @@ def dicom_handler(img_path, modality, num_output_channels=1, WW=None, WL=None):
                 img = Image.fromarray(np.dstack(channels))
 
         else:
-            img = Image.fromarray(dcm_data.pixel_array)
+            img = dicom_to_hu(img_path).astype('float32')
+            img = Image.fromarray(img, 'F')
 
     else:
-        img = Image.fromarray(dcm_data.pixel_array)
+        img = Image.fromarray(dcm_data.pixel_array.astype('float32'))
     return img

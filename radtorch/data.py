@@ -3,7 +3,12 @@ from .utils import *
 
 class DICOMDataset():
 
-    def __init__(self, root, ext='dcm', modality='CT', label_table=None, path_col='img_path', label_col='img_label', num_output_channels=1, transform=None, HU=False, WW=None, WL=None, split=None, ignore_zero_img=False, sample=False, train_balance=False):
+    def __init__(
+    self, root, ext='dcm', modality='CT', \
+    label_table=None, path_col='img_path', \
+    label_col='img_label', num_output_channels=1, \
+    transform=None, WW=None, WL=None, split=None, \
+    ignore_zero_img=False, sample=False, train_balance=False):
 
         subsets = ['train', 'valid', 'test']
         if root.endswith('/'):self.root = root
@@ -12,7 +17,6 @@ class DICOMDataset():
         self.label_col = label_col
         self.path_col = path_col
         self.transforms = {}
-        self.HU = HU
         self.modality = modality
         self.num_output_channels=num_output_channels
 
@@ -24,6 +28,9 @@ class DICOMDataset():
         self.window= WW
         self.level = WL
 
+        if all (type(i)==list and type(i[0])==str for i in [WW, WL]):
+            self.window = [v['window'] for k, v in CT_window_level.items() if k in WW ]
+            self.level = [v['level'] for k, v in CT_window_level.items() if k in WL ]
 
         if isinstance(label_table, dict):
             self.data_table, self.classes, self.class_to_idx = dict_to_data(table_dict=label_table, classes=self.classes, label_col = self.label_col)
@@ -89,12 +96,12 @@ class DICOMDataset():
             output = {}
             for k, v in self.data_table.items():
                 output[k] = DICOMProcessor(root=self.root, ext=self.ext, modality=self.modality, num_output_channels=self.num_output_channels, table=v, class_to_idx = self.class_to_idx, path_col=self.path_col, label_col=self.label_col, \
-                transform=self.transforms[k], HU=self.HU, window=self.window, level=self.level).get_loaders(batch_size=batch_size, shuffle=shuffle)
+                transform=self.transforms[k], window=self.window, level=self.level).get_loaders(batch_size=batch_size, shuffle=shuffle)
             return output
 
     def view_batch(self, data='train', figsize = (25,5), rows=2, batch_size=16, shuffle=True, num_images=None, cmap='gray'):
         loader = DICOMProcessor(root=self.root, ext=self.ext, modality=self.modality,  num_output_channels=self.num_output_channels, table=self.data_table[data], class_to_idx = self.class_to_idx, path_col=self.path_col, label_col=self.label_col, transform=self.transforms[data], \
-        HU=self.HU, window=self.window, level=self.level).get_loaders(batch_size=batch_size, shuffle=shuffle)
+        window=self.window, level=self.level).get_loaders(batch_size=batch_size, shuffle=shuffle)
         uidx, images, labels  = (iter(loader)).next()
 
         images = images.cpu().numpy()
@@ -125,7 +132,7 @@ class DICOMDataset():
 
     def view_multichannel_image(self, data='train', idx=0, figsize = (25,5), batch_size=16, shuffle=True, cmap='gray'):
         loader = DICOMProcessor(root=self.root, ext=self.ext, table=self.data_table[data], class_to_idx = self.class_to_idx, path_col=self.path_col, label_col=self.label_col, transform=self.transforms[data], \
-        HU=self.HU, num_output_channels = self.num_output_channels, window=self.window, level=self.level).get_loaders(batch_size=batch_size, shuffle=shuffle)
+        num_output_channels = self.num_output_channels, window=self.window, level=self.level).get_loaders(batch_size=batch_size, shuffle=shuffle)
         uidx, images, labels  = (iter(loader)).next()
 
         images = images.cpu().numpy()
@@ -199,13 +206,12 @@ class DICOMDataset():
 
 class DICOMProcessor(Dataset):
 
-    def __init__(self, root, ext='dcm', modality='CT', table=None, class_to_idx = None, path_col=None, label_col=None, transform=None, HU=False, num_output_channels=1, window=None, level=None, split=None, ):
+    def __init__(self, root, ext='dcm', modality='CT', table=None, class_to_idx = None, path_col=None, label_col=None, transform=None, num_output_channels=1, window=None, level=None, split=None, ):
         self.ext = ext
         if root.endswith('/'):self.root = root
         else: self.root = root+'/'
         self.modality = modality
         self.num_output_channels=num_output_channels
-        self.HU = HU
         self.window= window
         self.level = level
         self.class_to_idx = class_to_idx
