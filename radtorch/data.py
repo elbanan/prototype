@@ -6,7 +6,7 @@ from .utils import *
 
 class DICOMDataset():
 
-    def __init__(self, root, ext='dcm', modality='CT', label_table=None, path_col='img_path', label_col='img_label', num_output_channels=1, transform=None, HU=False, per_channel_wl=False, window=None, level=None, split=None, ignore_zero_img=False, sample=False, train_balance=False):
+    def __init__(self, root, ext='dcm', modality='CT', label_table=None, path_col='img_path', label_col='img_label', num_output_channels=1, transform=None, HU=False, window=None, level=None, split=None, ignore_zero_img=False, sample=False, train_balance=False):
 
         subsets = ['train', 'valid', 'test']
         if root.endswith('/'):self.root = root
@@ -26,13 +26,6 @@ class DICOMDataset():
 
         self.window= window
         self.level = level
-        self.per_class_wl=False
-        self.per_channel_wl = per_channel_wl
-
-        if isinstance(self.window, dict):
-            self.per_class_wl = True
-        if isinstance(self.level, dict):
-            self.per_class_wl = True
 
 
         if isinstance(label_table, dict):
@@ -99,12 +92,12 @@ class DICOMDataset():
             output = {}
             for k, v in self.data_table.items():
                 output[k] = DICOMProcessor(root=self.root, ext=self.ext, modality=self.modality, num_output_channels=self.num_output_channels, table=v, class_to_idx = self.class_to_idx, path_col=self.path_col, label_col=self.label_col, \
-                transform=self.transforms[k], HU=self.HU, per_channel_wl=self.per_channel_wl, window=self.window, level=self.level).get_loaders(batch_size=batch_size, shuffle=shuffle)
+                transform=self.transforms[k], HU=self.HU, window=self.window, level=self.level).get_loaders(batch_size=batch_size, shuffle=shuffle)
             return output
 
     def view_batch(self, data='train', figsize = (25,5), rows=2, batch_size=16, shuffle=True, num_images=None, cmap='gray'):
         loader = DICOMProcessor(root=self.root, ext=self.ext, modality=self.modality,  num_output_channels=self.num_output_channels, table=self.data_table[data], class_to_idx = self.class_to_idx, path_col=self.path_col, label_col=self.label_col, transform=self.transforms[data], \
-        HU=self.HU, per_channel_wl=self.per_channel_wl, window=self.window, level=self.level).get_loaders(batch_size=batch_size, shuffle=shuffle)
+        HU=self.HU, window=self.window, level=self.level).get_loaders(batch_size=batch_size, shuffle=shuffle)
         uidx, images, labels  = (iter(loader)).next()
 
         images = images.cpu().numpy()
@@ -137,7 +130,7 @@ class DICOMDataset():
 
     def view_multichannel_image(self, data='train', idx=0, figsize = (25,5), batch_size=16, shuffle=True, cmap='gray'):
         loader = DICOMProcessor(root=self.root, ext=self.ext, table=self.data_table[data], class_to_idx = self.class_to_idx, path_col=self.path_col, label_col=self.label_col, transform=self.transforms[data], \
-        HU=self.HU, num_output_channels = self.num_output_channels, per_channel_wl=self.per_channel_wl, window=self.window, level=self.level).get_loaders(batch_size=batch_size, shuffle=shuffle)
+        HU=self.HU, num_output_channels = self.num_output_channels, window=self.window, level=self.level).get_loaders(batch_size=batch_size, shuffle=shuffle)
         uidx, images, labels  = (iter(loader)).next()
 
         images = images.cpu().numpy()
@@ -210,7 +203,7 @@ class DICOMDataset():
 
 class DICOMProcessor(Dataset):
 
-    def __init__(self, root, ext='dcm', modality='CT', table=None, class_to_idx = None, path_col=None, label_col=None, transform=None, HU=False, num_output_channels=1, per_channel_wl=False, window=None, level=None, split=None, ):
+    def __init__(self, root, ext='dcm', modality='CT', table=None, class_to_idx = None, path_col=None, label_col=None, transform=None, HU=False, num_output_channels=1, window=None, level=None, split=None, ):
         self.ext = ext
         if root.endswith('/'):self.root = root
         else: self.root = root+'/'
@@ -219,12 +212,6 @@ class DICOMProcessor(Dataset):
         self.HU = HU
         self.window= window
         self.level = level
-        self.per_class_wl = False
-        self.per_channel_wl = per_channel_wl
-        if isinstance(self.window, dict):
-            self.per_class_wl = True
-        if isinstance(self.level, dict):
-            self.per_class_wl = True
         self.class_to_idx = class_to_idx
 
         if path_col:self.path_col = path_col
@@ -269,24 +256,7 @@ class DICOMProcessor(Dataset):
         if self.ext != 'dcm':
             img=Image.open(P)
         else:
-            if self.per_class_wl:
-                w = self.window[L]
-                l = self.level[L]
-                # img=dicom_to_array(filepath=P, HU=self.HU, window=w, level=l)
-                img = dicom_handler(img_path=P, modality=self.modality, num_output_channels=self.num_output_channels, w=w, l=l)
-            elif self.num_output_channels >1 : #maximum 3
-                img = dicom_handler(img_path=P, modality=self.modality, num_output_channels=self.num_output_channels, w=self.window, l=self.level)
-            else:
-                img = dicom_handler(img_path=P, modality=self.modality, num_output_channels=self.num_output_channels, w=self.window, l=self.level)
-            # #
-            # #     img = dicom_handler(img_path=P, num_output_channels=len(self.per_channel_wl), l=[i['level'] for i in self.per_channel_wl], w=[i['window'] for i in self.per_channel_wl])
-            # # else:
-            # #     img=dicom_to_array(filepath=P, HU=self.HU, window=self.window, level=self.level)
-            # if self.per_channel_wl:
-            #     img = img
-            # else:
-            #     img=dicom_array_to_pil(img)
-            # img=dicom_array_to_pil(img)
+            img = dicom_handler(img_path=P, modality=self.modality, num_output_channels=self.num_output_channels, w=self.window, l=self.level)
         if self.transforms:
             img=self.transforms(img)
         try:
