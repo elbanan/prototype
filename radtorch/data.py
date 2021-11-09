@@ -1,12 +1,9 @@
 from .utils import *
 
-# %matplotlib inline
-# %config InlineBackend.figure_format='retina'
-
 
 class DICOMDataset():
 
-    def __init__(self, root, ext='dcm', modality='CT', label_table=None, path_col='img_path', label_col='img_label', num_output_channels=1, transform=None, HU=False, window=None, level=None, split=None, ignore_zero_img=False, sample=False, train_balance=False):
+    def __init__(self, root, ext='dcm', modality='CT', label_table=None, path_col='img_path', label_col='img_label', num_output_channels=1, transform=None, HU=False, WW=None, WL=None, split=None, ignore_zero_img=False, sample=False, train_balance=False):
 
         subsets = ['train', 'valid', 'test']
         if root.endswith('/'):self.root = root
@@ -24,8 +21,8 @@ class DICOMDataset():
         self.sample = sample
         self.train_balance=train_balance
 
-        self.window= window
-        self.level = level
+        self.window= WW
+        self.level = WL
 
 
         if isinstance(label_table, dict):
@@ -117,11 +114,9 @@ class DICOMDataset():
             ax = fig.add_subplot(rows, int(batch/rows), i+1, xticks=[], yticks=[])
 
             if images[i].shape[0] == 3:
-                # img = images[i]
-                # img = img / 2 + 0.5
-                out= np.transpose(images[i], (1, 2, 0))
-                ax.imshow((out * 255).astype(np.uint8), cmap=cmap)
-                # ax.imshow(np.transpose(images[i], (1, 2, 0)), cmap=cmap)
+                # out= np.transpose(images[i], (1, 2, 0))
+                # ax.imshow((out * 255).astype(np.uint8), cmap=cmap)
+                ax.imshow(np.transpose(images[i], (1, 2, 0)), cmap=cmap)
 
             elif images[i].shape[0] ==1:
                 ax.imshow(np.squeeze(images[i]), cmap=cmap)
@@ -144,7 +139,7 @@ class DICOMDataset():
         num_channels = img.shape[0]
         fig = plt.figure(figsize=figsize)
         img = np.transpose(img, (1, 2, 0))
-        
+
         channels=[img[:,:,i] for i in range (0, num_channels)]
         # for i in range(0,num_channels):
         #     channels.append(img[:, :, i])

@@ -2,8 +2,6 @@ from .utils import *
 from .metrics import *
 from .inference import *
 
-# %matplotlib inline
-# %config InlineBackend.figure_format='retina'
 
 class ImageClassifier():
 
@@ -149,15 +147,3 @@ class ImageClassifier():
             print ('Export done successfully.')
         except:
             raise ValueError('Cannot Export.')
-
-
-# FIX uid with upsample and downsample
-# metrics for all sklearn and nn models
-
-
-
-# self mean/std
-# resume training
-# set random seed
-# T-Sne visualization
-#select only certain classes

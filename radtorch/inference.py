@@ -1,7 +1,5 @@
 from .utils import *
 
-# %matplotlib inline
-# %config InlineBackend.figure_format='retina'
 
 class Inference():
     def __init__(self, classifier=False, feature_extractor=False, mode='non-sklearn', specific_transform=False):
@@ -10,14 +8,14 @@ class Inference():
             self.classifier = classifier
             self.model = self.classifier.best_model
             self.dataset = self.classifier.loaders['test'].dataset
-            self.transforms = self.ds.transforms
+            self.transforms = self.dataset.transforms
 
         elif self.mode == 'sklearn':
             self.classifier = classifier
             self.feature_extractor = feature_extractor
             self.model = self.feature_extractor.model
             self.dataset = self.feature_extractor.dataset
-            self.transforms = self.ds.transforms['train']
+            self.transforms = self.dataset.transforms['train']
 
         if specific_transform:self.transforms=specific_transform
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -35,7 +33,7 @@ class Inference():
         if ext != '.dcm':
             img=Image.open(img_path)
         else:
-            img = dicom_handler(img_path=img_path, modality=self.dataset.modality, num_output_channels=self.dataset.num_output_channels, w=self.dataset.window, l=self.dataset.level)
+            img = dicom_handler(img_path=img_path, modality=self.dataset.modality, num_output_channels=self.dataset.num_output_channels, WW=self.dataset.window, WL=self.dataset.level)
 
         img = self.transforms(img)
         img = torch.unsqueeze(img, 0)
@@ -71,20 +69,5 @@ class Inference():
             for class_pred in predictions:
                 for i in class_pred:
                     print('class: {:4} [prob: {:.2f}%]'.format(i['class'], i['prob']*100))
-
-
+                    
         return predictions
-
-
-
-
-# FIX uid with upsample and downsample
-# metrics for all sklearn and nn models
-
-
-
-# self mean/std
-# resume training
-# set random seed
-# T-Sne visualization
-#select only certain classes

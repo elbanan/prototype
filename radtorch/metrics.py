@@ -1,9 +1,5 @@
 from .utils import *
 
-# %matplotlib inline
-# %config InlineBackend.figure_format='retina'
-
-
 class Metrics():
 
     def __init__(self, classifier, device, use_best=True):
