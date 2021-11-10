@@ -278,6 +278,6 @@ def dicom_handler(img_path, num_output_channels=1, WW=None, WL=None):
                 raise ValueError('Only 1 or 3 channels is supported.')
 
         else:
-            img = Image.fromarray(dcm_data.pixel_array.astype('float32'))
+            img = Image.fromarray(dcm_data.pixel_array)
 
     return img
