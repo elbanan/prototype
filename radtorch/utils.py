@@ -52,6 +52,12 @@ def root_to_data(root, path_col, label_col, ext):
     df[label_col] = list_label
     return df
 
+def id_to_path(df, root, id_col, path_col = 'img_path', ext='.dcm'):
+    if root[-1] != '/' : root = root+'/'
+    df[path_col] = [root+r[id_col]+ext for i,r in df.iterrows()]
+    return df
+
+
 def create_seq_classifier(fc, i, l, o, batch_norm=True):
     layers = {}
     layers['fc0']= nn.Linear(i, l[0])
@@ -219,47 +225,6 @@ def Normalize_255(array):
 
 def Normalize_1_1(array):
     return 2.*(array - np.min(array))/np.ptp(array)-1
-
-# def dicom_handler(img_path, num_output_channels=1, WW=None, WL=None):
-#
-#     dcm_data = pydicom.read_file(img_path)
-#     modality = dcm_data.Modality
-#
-#     if dcm_data.Modality == 'CT':
-#
-#         if all(i!=None for i in [WW, WL]):
-#
-#             img = dicom_to_hu(img_path)
-#
-#             if num_output_channels == 1:
-#                 img = Image.fromarray(wl_array(img, WW, WL))
-#
-#             elif num_output_channels > 3:
-#                     raise ValueError('Only 1 or 3 channels is supported.')
-#             else:
-#                 channels = []
-#                 for c in range(num_output_channels):
-#                     channels.append(wl_array(img, WW=WW[c], WL=WL[c]))
-#                 img = Image.fromarray(np.dstack(channels))
-#
-#         else:
-#             img = dicom_to_hu(img_path).astype('float32')
-#             img = Image.fromarray(img, 'F')
-#
-#     else:
-#         if num_output_channels > 3:
-#             raise ValueError('Only 1 or 3 channels is supported.')
-#         channels = []
-#         if num_output_channels == 3:
-#             i = Normalize_0_1(dcm_data.pixel_array)
-#             img = np.dstack([i ,i, i])
-#             img = Image.fromarray(img)
-#         else:
-#             img = Image.fromarray(dcm_data.pixel_array.astype('float32'))
-#     return img
-
-
-
 
 def dicom_handler(img_path, num_output_channels=1, WW=None, WL=None):
 
