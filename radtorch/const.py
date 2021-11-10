@@ -20,6 +20,7 @@ requirements = ['imageio==2.9.0',
       'wrapt==1.12.1',
       'xgboost==1.4.2',]
 
+subsets = ['train', 'valid', 'test']
 
 model_url = {
     "vgg11": "https://download.pytorch.org/models/vgg11-8a719046.pth",

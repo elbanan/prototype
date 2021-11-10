@@ -19,7 +19,7 @@ class FeatureExtractor():
         self.loaders = self.dataset.get_loaders(batch_size=batch_size)
         with torch.no_grad():
             self.model.eval()
-            uid_list = torch.IntTensor([])
+            # uid_list = torch.IntTensor([])
             for i, (uid, images, labels) in tqdm(enumerate(self.loaders['train']), total=len(self.loaders['train'])):
                 images, labels = images.to(self.device), labels.to(self.device)
                 output = self.model(images)

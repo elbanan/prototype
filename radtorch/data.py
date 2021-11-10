@@ -10,13 +10,12 @@ class DICOMDataset():
     transform=None, WW=None, WL=None, split=None, \
     ignore_zero_img=False, sample=False, train_balance=False):
 
-        subsets = ['train', 'valid', 'test']
         if root.endswith('/'):self.root = root
         else: self.root = root+'/'
+
         self.ext = ext
         self.label_col = label_col
         self.path_col = path_col
-        self.transforms = {}
         self.num_output_channels=num_output_channels
 
         self.idx = {}
@@ -24,15 +23,14 @@ class DICOMDataset():
         self.sample = sample
         self.train_balance=train_balance
 
-        self.window= WW
-        self.level = WL
+        self.window, self.level = check_wl(WW, WL)
 
-        if all (type(i)==list and type(i[0])==str for i in [WW, WL]):
-            self.window = [v['window'] for k, v in CT_window_level.items() if k in WW ]
-            self.level = [v['level'] for k, v in CT_window_level.items() if k in WL ]
 
         if isinstance(label_table, dict):
             self.data_table, self.classes, self.class_to_idx = dict_to_data(table_dict=label_table, classes=self.classes, label_col = self.label_col)
+            for k,v in self.data_table:
+                v = add_uid_column(v, length=10)
+
         else:
             if isinstance(label_table, pd.DataFrame):
                 self.data_table= {}
@@ -43,7 +41,7 @@ class DICOMDataset():
                 self.data_table = {}
                 self.classes, self.class_to_idx = find_classes(self.root)
                 table = root_to_data(root=self.root, ext=self.ext, path_col=self.path_col, label_col=self.label_col)
-                table['uid'] = table.index.tolist()
+
                 if len(table) == 0:
                     raise ValueError('No .{:} files were found in {:}. Please check.'.format(self.ext, self.root))
             if split:
@@ -54,14 +52,18 @@ class DICOMDataset():
                     self.idx['test'], self.idx['valid'], self.idx['train'] = split_data(table, valid_percent=self.valid_percent, test_percent=self.test_percent)
                     for i in subsets:
                         self.data_table[i] = table.loc[self.idx[i],:]
+                        self.data_table[i] = add_uid_column(self.data_table[i], length=10)
                 else:
                     # self.test_percent=None
                     self.train_percent = 1.0-self.valid_percent
                     self.idx['train'], self.idx['valid'] = self.split_data(table, valid_percent=self.valid_percent, test_percent=False)
                     for i in subsets[:2]:
                         self.data_table[i] = table.loc[self.idx[i],:]
+                        self.data_table[i] = add_uid_column(self.data_table[i], length=10)
+
             else:
                 self.data_table['train'] = table
+                
 
         if self.ignore_zero_img:
             for i in self.ignore_zero_img:
@@ -74,11 +76,14 @@ class DICOMDataset():
         if self.train_balance:
             self.data_table['train'] = balance(df=self.data_table['train'], method=self.train_balance, label_col=self.label_col, classes=self.classes, )
 
+        self.data_table['train'] = add_uid_column(self.data_table['train'], length=10)
+
         if type(transform) is dict:
             self.transforms = transform
         else:
-            for k,v in self.data_table.items():
-                self.transforms[k] = transforms.Compose([transforms.ToTensor()])
+            self.transforms = {k:transforms.Compose([transforms.ToTensor()]) for k,v in self.data_table.items()}
+            # for k,v in self.data_table.items():
+            #     self.transforms[k] = transforms.Compose([transforms.ToTensor()])
 
     def info(self):
         info=pd.DataFrame.from_dict(({key:str(value) for key, value in self.__dict__.items()}).items())
@@ -262,7 +267,8 @@ class DICOMProcessor(Dataset):
         try:
             uid = self.table.iloc[idx]['uid']
         except:
-            uid = P
+            # uid = P
+            uid = self.table.index.values.tolist()[idx]
         return  uid, img, L_id
 
     def get_loaders(self, batch_size=16, shuffle=True):

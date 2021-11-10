@@ -1,4 +1,4 @@
-import torch, torchvision, itertools, glob, os, pydicom, copy, cv2
+import torch, torchvision, itertools, glob, os, pydicom, copy, cv2, uuid
 
 import numpy as np
 import pandas as pd
@@ -57,8 +57,7 @@ def id_to_path(df, root, id_col, path_col = 'img_path', ext='.dcm'):
     df[path_col] = [root+r[id_col]+ext for i,r in df.iterrows()]
     return df
 
-
-def create_seq_classifier(fc, i, l, o, batch_norm=True):
+def create_seq_classifier(fc, i, l, o, batch_norm=True): #needs documentation
     layers = {}
     layers['fc0']= nn.Linear(i, l[0])
     layers['r0']= nn.ReLU()
@@ -281,3 +280,14 @@ def dicom_handler(img_path, num_output_channels=1, WW=None, WL=None):
             img = Image.fromarray(dcm_data.pixel_array)
 
     return img
+
+def check_wl(WW, WL):
+
+    if all (type(i)==list and type(i[0])==str for i in [WW, WL]):
+        WW = [v['window'] for k, v in CT_window_level.items() if k in WW ]
+        WL = [v['level'] for k, v in CT_window_level.items() if k in WL ]
+    return WW, WL
+
+def add_uid_column(df, length=10):
+    df['uid'] = [int(str(uuid.uuid1().int)[:length]) for i in range (len(df)) ]
+    return df
