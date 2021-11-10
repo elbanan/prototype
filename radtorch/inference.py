@@ -33,7 +33,7 @@ class Inference():
         if ext != '.dcm':
             img=Image.open(img_path)
         else:
-            img = dicom_handler(img_path=img_path, modality=self.dataset.modality, num_output_channels=self.dataset.num_output_channels, WW=self.dataset.window, WL=self.dataset.level)
+            img = dicom_handler(img_path=img_path, num_output_channels=self.dataset.num_output_channels, WW=self.dataset.window, WL=self.dataset.level)
 
         img = self.transforms(img)
         img = torch.unsqueeze(img, 0)
@@ -69,5 +69,5 @@ class Inference():
             for class_pred in predictions:
                 for i in class_pred:
                     print('class: {:4} [prob: {:.2f}%]'.format(i['class'], i['prob']*100))
-                    
+
         return predictions

@@ -4,7 +4,7 @@ from .utils import *
 class DICOMDataset():
 
     def __init__(
-    self, root, ext='dcm', modality='CT', \
+    self, root, ext='dcm', \
     label_table=None, path_col='img_path', \
     label_col='img_label', num_output_channels=1, \
     transform=None, WW=None, WL=None, split=None, \
@@ -17,7 +17,6 @@ class DICOMDataset():
         self.label_col = label_col
         self.path_col = path_col
         self.transforms = {}
-        self.modality = modality
         self.num_output_channels=num_output_channels
 
         self.idx = {}
@@ -95,12 +94,12 @@ class DICOMDataset():
         else:
             output = {}
             for k, v in self.data_table.items():
-                output[k] = DICOMProcessor(root=self.root, ext=self.ext, modality=self.modality, num_output_channels=self.num_output_channels, table=v, class_to_idx = self.class_to_idx, path_col=self.path_col, label_col=self.label_col, \
+                output[k] = DICOMProcessor(root=self.root, ext=self.ext, num_output_channels=self.num_output_channels, table=v, class_to_idx = self.class_to_idx, path_col=self.path_col, label_col=self.label_col, \
                 transform=self.transforms[k], window=self.window, level=self.level).get_loaders(batch_size=batch_size, shuffle=shuffle)
             return output
 
     def view_batch(self, data='train', figsize = (25,5), rows=2, batch_size=16, shuffle=True, num_images=None, cmap='gray'):
-        loader = DICOMProcessor(root=self.root, ext=self.ext, modality=self.modality,  num_output_channels=self.num_output_channels, table=self.data_table[data], class_to_idx = self.class_to_idx, path_col=self.path_col, label_col=self.label_col, transform=self.transforms[data], \
+        loader = DICOMProcessor(root=self.root, ext=self.ext, num_output_channels=self.num_output_channels, table=self.data_table[data], class_to_idx = self.class_to_idx, path_col=self.path_col, label_col=self.label_col, transform=self.transforms[data], \
         window=self.window, level=self.level).get_loaders(batch_size=batch_size, shuffle=shuffle)
         uidx, images, labels  = (iter(loader)).next()
 
@@ -206,11 +205,10 @@ class DICOMDataset():
 
 class DICOMProcessor(Dataset):
 
-    def __init__(self, root, ext='dcm', modality='CT', table=None, class_to_idx = None, path_col=None, label_col=None, transform=None, num_output_channels=1, window=None, level=None, split=None, ):
+    def __init__(self, root, ext='dcm', table=None, class_to_idx = None, path_col=None, label_col=None, transform=None, num_output_channels=1, window=None, level=None, split=None, ):
         self.ext = ext
         if root.endswith('/'):self.root = root
         else: self.root = root+'/'
-        self.modality = modality
         self.num_output_channels=num_output_channels
         self.window= window
         self.level = level
@@ -258,7 +256,7 @@ class DICOMProcessor(Dataset):
         if self.ext != 'dcm':
             img=Image.open(P)
         else:
-            img = dicom_handler(img_path=P, modality=self.modality, num_output_channels=self.num_output_channels, WW=self.window, WL=self.level)
+            img = dicom_handler(img_path=P, num_output_channels=self.num_output_channels, WW=self.window, WL=self.level)
         if self.transforms:
             img=self.transforms(img)
         try:

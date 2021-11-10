@@ -196,7 +196,7 @@ def model_info(model, list=False, batch_size=1, channels=3, img_dim=224):
     else:
         return summary(model, input_size=(batch_size, channels, img_dim, img_dim), depth=channels, col_names=["input_size", "output_size", "num_params"],)
 
-def wl_array(array, WW, WL):
+def wl_array(array, WW, WL): #https://storage.googleapis.com/kaggle-forum-message-attachments/1010629/17014/convert_to_jpeg_for_kaggle.py
     upper, lower = WL+WW//2, WL-WW//2
     X = np.clip(array.copy(), lower, upper)
     X = X - np.min(X)
@@ -215,31 +215,98 @@ def Normalize_0_1(array):
     return (array - np.min(array)) / (np.max(array) - np.min(array))
 
 def Normalize_255(array):
-    # return array/(array.max()/255.0)
     return (255*(array - np.min(array))/np.ptp(array)).astype(int)
 
 def Normalize_1_1(array):
     return 2.*(array - np.min(array))/np.ptp(array)-1
 
-def dicom_handler(img_path, modality, num_output_channels=1, WW=None, WL=None):
+# def dicom_handler(img_path, num_output_channels=1, WW=None, WL=None):
+#
+#     dcm_data = pydicom.read_file(img_path)
+#     modality = dcm_data.Modality
+#
+#     if dcm_data.Modality == 'CT':
+#
+#         if all(i!=None for i in [WW, WL]):
+#
+#             img = dicom_to_hu(img_path)
+#
+#             if num_output_channels == 1:
+#                 img = Image.fromarray(wl_array(img, WW, WL))
+#
+#             elif num_output_channels > 3:
+#                     raise ValueError('Only 1 or 3 channels is supported.')
+#             else:
+#                 channels = []
+#                 for c in range(num_output_channels):
+#                     channels.append(wl_array(img, WW=WW[c], WL=WL[c]))
+#                 img = Image.fromarray(np.dstack(channels))
+#
+#         else:
+#             img = dicom_to_hu(img_path).astype('float32')
+#             img = Image.fromarray(img, 'F')
+#
+#     else:
+#         if num_output_channels > 3:
+#             raise ValueError('Only 1 or 3 channels is supported.')
+#         channels = []
+#         if num_output_channels == 3:
+#             i = Normalize_0_1(dcm_data.pixel_array)
+#             img = np.dstack([i ,i, i])
+#             img = Image.fromarray(img)
+#         else:
+#             img = Image.fromarray(dcm_data.pixel_array.astype('float32'))
+#     return img
+
+
+
+
+def dicom_handler(img_path, num_output_channels=1, WW=None, WL=None):
+
     dcm_data = pydicom.read_file(img_path)
-    if modality == 'CT':
-        if all(i!=None for i in [WW, WL]):
-            img = dicom_to_hu(img_path)
-            if num_output_channels == 1:
-                img = Image.fromarray(wl_array(img, WW, WL))
+    modality = dcm_data.Modality
+
+    if dcm_data.Modality == 'CT':
+        array = dicom_to_hu(img_path)
+
+        if num_output_channels == 1:
+
+            if all(i!=None for i in [WW, WL]):
+                # img = dcm_data.pixel_array
+                img = Image.fromarray(wl_array(array, WW, WL))
             else:
-                if num_output_channels > 3:
-                    raise ValueError('Only 1 or 3 channels is supported.')
-                channels = []
-                for c in range(num_output_channels):
-                    channels.append(wl_array(img, WW=WW[c], WL=WL[c]))
+                img = Image.fromarray(dicom_to_hu(img_path).astype('float32'), 'F')
+
+        elif num_output_channels == 3:
+
+            if all(i!=None for i in [WW, WL]):
+                # img = dcm_data.pixel_array
+                channels = [wl_array(array, WW=WW[c], WL=WL[c]) for c in range(num_output_channels)]
                 img = Image.fromarray(np.dstack(channels))
+            else:
+                channels = [array for c in range(num_output_channels)]
+                img_stacked = np.dstack(channels)
+                img_stacked = Normalize_0_1(img_stacked)*255
+                img = Image.fromarray(img_stacked.astype(np.uint8))
+
 
         else:
-            img = dicom_to_hu(img_path).astype('float32')
-            img = Image.fromarray(img, 'F')
+            raise ValueError('Only 1 or 3 channels is supported.')
+
 
     else:
-        img = Image.fromarray(dcm_data.pixel_array.astype('float32'))
+
+        if num_output_channels == 1:
+                img = Image.fromarray(dcm_data.pixel_array.astype('float32'))
+
+        elif num_output_channels == 3:
+                array = dcm_data.pixel_array
+                channels = [array for c in range(num_output_channels)]
+                img_stacked = np.dstack(channels)
+                img_stacked = Normalize_0_1(img_stacked)*255
+                img = Image.fromarray(img_stacked.astype(np.uint8))
+
+        else:
+            raise ValueError('Only 1 or 3 channels is supported.')
+
     return img
