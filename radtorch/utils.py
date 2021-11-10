@@ -230,6 +230,7 @@ def dicom_handler(img_path, num_output_channels=1, WW=None, WL=None):
 
     dcm_data = pydicom.read_file(img_path)
     modality = dcm_data.Modality
+    num_source_channel = dcm_data.SamplesPerPixel
 
     if dcm_data.Modality == 'CT':
         array = dicom_to_hu(img_path)
@@ -261,17 +262,22 @@ def dicom_handler(img_path, num_output_channels=1, WW=None, WL=None):
 
     else:
 
-        if num_output_channels == 1:
-                img = Image.fromarray(dcm_data.pixel_array.astype('float32'))
+        if num_source_channel != 3:
 
-        elif num_output_channels == 3:
-                array = dcm_data.pixel_array
-                channels = [array for c in range(num_output_channels)]
-                img_stacked = np.dstack(channels)
-                img_stacked = Normalize_0_1(img_stacked)*255
-                img = Image.fromarray(img_stacked.astype(np.uint8))
+            if num_output_channels == 1:
+                    img = Image.fromarray(dcm_data.pixel_array.astype('float32'))
+
+            elif num_output_channels == 3:
+                    array = dcm_data.pixel_array
+                    channels = [array for c in range(num_output_channels)]
+                    img_stacked = np.dstack(channels)
+                    img_stacked = Normalize_0_1(img_stacked)*255
+                    img = Image.fromarray(img_stacked.astype(np.uint8))
+
+            else:
+                raise ValueError('Only 1 or 3 channels is supported.')
 
         else:
-            raise ValueError('Only 1 or 3 channels is supported.')
+            img = Image.fromarray(dcm_data.pixel_array.astype('float32'))
 
     return img
