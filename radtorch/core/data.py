@@ -82,8 +82,6 @@ class DICOMDataset():
             self.transforms = transform
         else:
             self.transforms = {k:transforms.Compose([transforms.ToTensor()]) for k,v in self.data_table.items()}
-            # for k,v in self.data_table.items():
-            #     self.transforms[k] = transforms.Compose([transforms.ToTensor()])
 
         self.loaders = self.get_loaders(batch_size=batch_size, subset=output_subset)
 
@@ -97,19 +95,12 @@ class DICOMDataset():
 
     def get_loaders(self, batch_size=16, shuffle=True, subset='all'):
         if subset == 'all':
-            # if 'loaders' in self.__dict__.keys():
-            #     return self.loaders DICOMProcessor(root=self.root, ext=self.ext, num_output_channels=self.num_output_channels, table=v, class_to_idx = self.class_to_idx, path_col=self.path_col, label_col=self.label_col, \
-            #     transform=self.transforms[k], window=self.window, level=self.level).get_loaders(batch_size=batch_size, shuffle=shuffle)
-            # else:
             output = {}
             for k, v in self.data_table.items():
                 output[k] = DICOMProcessor(root=self.root, ext=self.ext, num_output_channels=self.num_output_channels, table=v, class_to_idx = self.class_to_idx, path_col=self.path_col, label_col=self.label_col, \
                 transform=self.transforms[k], window=self.window, level=self.level).get_loaders(batch_size=batch_size, shuffle=shuffle)
             return output
         else:
-            # if 'loaders' in self.__dict__.keys():
-            #     return loader[subset]
-            # else:
             return {subset: DICOMProcessor(root=self.root, ext=self.ext, num_output_channels=self.num_output_channels, table=self.data_table[subset], class_to_idx = self.class_to_idx, path_col=self.path_col, label_col=self.label_col, \
             transform=self.transforms[subset], window=self.window, level=self.level).get_loaders(batch_size=batch_size, shuffle=shuffle)}
 
@@ -136,8 +127,6 @@ class DICOMDataset():
             ax = fig.add_subplot(rows, int(batch/rows), i+1, xticks=[], yticks=[])
 
             if images[i].shape[0] == 3:
-                # out= np.transpose(images[i], (1, 2, 0))
-                # ax.imshow((out * 255).astype(np.uint8), cmap=cmap)
                 ax.imshow(np.transpose(images[i], (1, 2, 0)), cmap=cmap)
 
             elif images[i].shape[0] ==1:
@@ -163,8 +152,6 @@ class DICOMDataset():
         img = np.transpose(img, (1, 2, 0))
 
         channels=[img[:,:,i] for i in range (0, num_channels)]
-        # for i in range(0,num_channels):
-        #     channels.append(img[:, :, i])
 
         for i in range(0, num_channels):
             ax = fig.add_subplot(1, num_channels, i+1, xticks=[], yticks=[])

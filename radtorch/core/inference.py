@@ -78,5 +78,5 @@ class Inference():
             for class_pred in predictions:
                 for i in class_pred:
                     print('class: {:4} [prob: {:.2f}%]'.format(i['class'], i['prob']*100))
-
-        return predictions
+        else:
+            return predictions

@@ -105,7 +105,7 @@ class Metrics():
         print('\nTest Accuracy (Overall): %2d%% (%2d/%2d)' % (
             100. * np.sum(class_correct) / np.sum(class_total),
             np.sum(class_correct), np.sum(class_total)))
-            # self.accuracy = 100. * np.sum(class_correct) / np.sum(class_total)
+
 
     def confusion_matrix(self, target_loader='test', figure_size=(8,6), cmap='Blues', percent=False): #https://github.com/DTrimarchi10/confusion_matrix/blob/master/cf_matrix.py
         true_labels, pred_labels = self.get_predictions(target_loader=target_loader)

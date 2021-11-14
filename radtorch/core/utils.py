@@ -242,7 +242,6 @@ def dicom_handler(img_path, num_output_channels=1, WW=None, WL=None):
         if num_output_channels == 1:
 
             if all(i!=None for i in [WW, WL]):
-                # img = dcm_data.pixel_array
                 img = Image.fromarray(wl_array(array, WW, WL))
             else:
                 img = Image.fromarray(dicom_to_hu(img_path).astype('float32'), 'F')
@@ -250,7 +249,6 @@ def dicom_handler(img_path, num_output_channels=1, WW=None, WL=None):
         elif num_output_channels == 3:
 
             if all(i!=None for i in [WW, WL]):
-                # img = dcm_data.pixel_array
                 channels = [wl_array(array, WW=WW[c], WL=WL[c]) for c in range(num_output_channels)]
                 img = Image.fromarray(np.dstack(channels))
             else:

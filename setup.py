@@ -1,12 +1,8 @@
 from setuptools import setup, find_packages
 
-from datetime import datetime
-
-now = datetime.now()
-
 setup(
       name='radtorch',
-      version=now,
+      version=0.9.2,
       version_date='',
       description='RADTorch, The Radiology Machine Learning Framework',
       url='https://www.radtorch.com',

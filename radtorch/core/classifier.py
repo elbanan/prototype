@@ -110,15 +110,6 @@ class ImageClassifier():
                     self.best_model = deepcopy(self.training_model)
                     self.valid_loss_min = epoch_valid_loss
                     save_checkpoint(classifier=self, output_file=output_model)
-#                     checkpoint = {'type':'NN',
-#                                   'model':self.best_model,
-#                                   'optimizer_state_dict' : self.optimizer.state_dict(),
-#                                   'train_losses': self.train_losses,
-#                                   'valid_losses': self.valid_losses,
-#                                   'valid_loss_min': self.valid_loss_min,
-# #                       'state_dict': train_model.state_dict()
-#                                  }
-#                     torch.save(checkpoint, output_model)
                     save_status, validation_decrease_status = True, True
                 else:
                     save_status, validation_decrease_status = False, False
