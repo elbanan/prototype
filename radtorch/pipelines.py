@@ -2,7 +2,7 @@ from .core import *
 
 
 class ImageClassificationPipeline():
-    def __init__(self, root, model, model_arch,
+    def __init__(self, root, model, model_arch=None,
         ext='dcm', \
         label_table=None, path_col='img_path', label_col='img_label', \
         num_output_channels=1,transform=None, WW=None, WL=None, \
