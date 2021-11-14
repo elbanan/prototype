@@ -2,23 +2,26 @@ from .utils import *
 
 
 class Inference():
-    def __init__(self, classifier=False, feature_extractor=False, mode='non-sklearn', specific_transform=False):
-        self.mode = mode
-        if self.mode == 'non-sklearn':
-            self.classifier = classifier
-            self.model = self.classifier.best_model
-            self.dataset = self.classifier.loaders['test'].dataset
-            self.transforms = self.dataset.transforms
+    def __init__(self, classifier=False, specific_transform=False):
 
-        elif self.mode == 'sklearn':
-            self.classifier = classifier
-            self.feature_extractor = feature_extractor
-            self.model = self.feature_extractor.model
-            self.dataset = self.feature_extractor.dataset
+        self.classifier = classifier
+        self.dataset = self.classifier.dataset
+
+        try:
+            self.transforms = self.dataset.transforms['test']
+        except:
             self.transforms = self.dataset.transforms['train']
 
-        if specific_transform:self.transforms=specific_transform
+        if self.classifier.classifier_type == 'sklearn':
+            self.feature_extractor = self.classifier.feature_extractors['train']
+
+        self.model = self.classifier.best_model
+
+        if specific_transform:
+            self.transforms=specific_transform
+
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
 
     def predict(self, img_path, top_predictions='all', display_image=False, human=True):
         if top_predictions == 'all':
@@ -28,8 +31,8 @@ class Inference():
             if top > len(self.dataset.classes):
                 raise ValueError('Number of top predictions is more than number of classes. Please check')
 
-        name, ext = os.path.splitext(img_path)
 
+        name, ext = os.path.splitext(img_path)
         if ext != '.dcm':
             img=Image.open(img_path)
         else:
@@ -37,15 +40,22 @@ class Inference():
 
         img = self.transforms(img)
         img = torch.unsqueeze(img, 0)
+        img = img.to(self.device)
 
-        model, img = self.model.to(self.device), img.to(self.device)
-        with torch.no_grad():
-            model.eval()
-            model_output = model(img)
-        if self.mode == 'non-sklearn':
-            raw_pred = torch.nn.functional.softmax(model_output, dim=1).cpu().numpy()
-        elif self.mode == 'sklearn':
-            raw_pred = self.classifier.predict_proba(model_output.cpu().numpy())
+        if self.classifier.classifier_type == 'sklearn':
+            with torch.no_grad():
+                self.feature_extractor.model.eval()
+                nn_output = self.feature_extractor.model(img)
+                img_features = pd.DataFrame(nn_output.cpu().numpy())
+                raw_pred = self.classifier.best_model.predict_proba(img_features)
+                print (raw_pred)
+
+
+        elif self.classifier.classifier_type == 'torch':
+            with torch.no_grad():
+                self.model.eval()
+                nn_output = self.model(img)
+                raw_pred = torch.nn.functional.softmax(nn_output, dim=1).cpu().numpy()
 
         predictions = []
         s=0
@@ -56,6 +66,9 @@ class Inference():
                 o = sorted(o, key = lambda i: i['prob'], reverse=True)[:top]
             s = s+1
             predictions.append(o)
+
+
+
 
         if display_image:
             if ext != '.dcm':

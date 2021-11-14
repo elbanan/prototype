@@ -8,7 +8,7 @@ class DICOMDataset():
     label_table=None, path_col='img_path', \
     label_col='img_label', num_output_channels=1, \
     transform=None, WW=None, WL=None, split=None, \
-    ignore_zero_img=False, sample=False, train_balance=False):
+    ignore_zero_img=False, sample=False, train_balance=False, batch_size=16, output_subset='all'):
 
         if root.endswith('/'):self.root = root
         else: self.root = root+'/'
@@ -63,7 +63,7 @@ class DICOMDataset():
 
             else:
                 self.data_table['train'] = table
-                
+
 
         if self.ignore_zero_img:
             for i in self.ignore_zero_img:
@@ -85,6 +85,8 @@ class DICOMDataset():
             # for k,v in self.data_table.items():
             #     self.transforms[k] = transforms.Compose([transforms.ToTensor()])
 
+        self.loaders = self.get_loaders(batch_size=batch_size, subset=output_subset)
+
     def info(self):
         info=pd.DataFrame.from_dict(({key:str(value) for key, value in self.__dict__.items()}).items())
         info.columns=['Property', 'Value']
@@ -93,15 +95,24 @@ class DICOMDataset():
             except: pass
         return info
 
-    def get_loaders(self, batch_size=16, shuffle=True):
-        if 'loaders' in self.__dict__.keys():
-            return self.loaders
-        else:
+    def get_loaders(self, batch_size=16, shuffle=True, subset='all'):
+        if subset == 'all':
+            # if 'loaders' in self.__dict__.keys():
+            #     return self.loaders DICOMProcessor(root=self.root, ext=self.ext, num_output_channels=self.num_output_channels, table=v, class_to_idx = self.class_to_idx, path_col=self.path_col, label_col=self.label_col, \
+            #     transform=self.transforms[k], window=self.window, level=self.level).get_loaders(batch_size=batch_size, shuffle=shuffle)
+            # else:
             output = {}
             for k, v in self.data_table.items():
                 output[k] = DICOMProcessor(root=self.root, ext=self.ext, num_output_channels=self.num_output_channels, table=v, class_to_idx = self.class_to_idx, path_col=self.path_col, label_col=self.label_col, \
                 transform=self.transforms[k], window=self.window, level=self.level).get_loaders(batch_size=batch_size, shuffle=shuffle)
             return output
+        else:
+            # if 'loaders' in self.__dict__.keys():
+            #     return loader[subset]
+            # else:
+            return {subset: DICOMProcessor(root=self.root, ext=self.ext, num_output_channels=self.num_output_channels, table=self.data_table[subset], class_to_idx = self.class_to_idx, path_col=self.path_col, label_col=self.label_col, \
+            transform=self.transforms[subset], window=self.window, level=self.level).get_loaders(batch_size=batch_size, shuffle=shuffle)}
+
 
     def view_batch(self, data='train', figsize = (25,5), rows=2, batch_size=16, shuffle=True, num_images=None, cmap='gray'):
         loader = DICOMProcessor(root=self.root, ext=self.ext, num_output_channels=self.num_output_channels, table=self.data_table[data], class_to_idx = self.class_to_idx, path_col=self.path_col, label_col=self.label_col, transform=self.transforms[data], \

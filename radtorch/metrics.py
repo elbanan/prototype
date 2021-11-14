@@ -2,76 +2,151 @@ from .utils import *
 
 class Metrics():
 
-    def __init__(self, classifier, device, use_best=True):
+    def __init__(self, classifier, use_best=True):
+
         self.classifier = classifier
-        self.device = device
-        self.auc='Please run metrics.roc() to generate roc auc.'
-        self.accuracy = 'Please run metrics.test() to generate accuracy.'
         self.use_best = use_best
 
-    def get_predictions(self, target_loader):
-        if self.use_best:
-            self.selected_model = self.classifier.best_model
-        else:
-            self.selected_model = self.classifier.training_model
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.auc='Please run metrics.roc() to generate roc auc.'
+        self.accuracy = 'Please run metrics.test() to generate accuracy.'
 
+
+        if self.classifier.classifier_type == 'torch':
+            if self.use_best:
+                self.selected_model = self.classifier.best_model
+            else:
+                self.selected_model = self.classifier.training_model
+        else:
+            self.selected_model = self.classifier.feature_extractors['train'].model
+
+
+    def get_predictions(self, target_loader, raw=False):
         true_labels = []
         pred_labels = []
+
+        if self.classifier.classifier_type == 'torch':
+            if self.use_best:
+                self.selected_model = self.classifier.best_model
+            else:
+                self.selected_model = self.classifier.training_model
+        else:
+            self.selected_model = self.classifier.feature_extractors['train'].model
+
         for i, (idx, imgs, labels) in tqdm(enumerate(self.classifier.loaders[target_loader]), total=len(self.classifier.loaders[target_loader])):
             imgs, labels = imgs.to(self.device), labels.to(self.device)
             true_labels = true_labels+labels.tolist()
+
             with torch.no_grad():
                 self.selected_model.to(self.device)
                 self.selected_model.eval()
                 out = self.selected_model(imgs)
-                pr = [(i.tolist()).index(max(i.tolist())) for i in out]
+                if self.classifier.classifier_type == 'torch':
+                    if raw:
+                        pr = [i.tolist() for i in out]
+                    else:
+                        pr = [(i.tolist()).index(max(i.tolist())) for i in out]
+                elif self.classifier.classifier_type == 'sklearn':
+                    if raw:
+                        pr = [i.tolist() for i in self.classifier.best_model.predict_proba(out)]
+                    else:
+                        pr = [(i.tolist()).index(max(i.tolist())) for i in self.classifier.best_model.predict_proba(out)]
+
                 pred_labels = pred_labels+pr
+
         return true_labels, pred_labels
 
-    def test(self):
-        if self.use_best:
-            self.selected_model = self.classifier.best_model
-        else:
-            self.selected_model = self.classifier.training_model
+
+
+    def test(self, target_loader='test'):
 
         test_loss = 0.0
-        class_correct = list(0. for i in range(len(self.classifier.classes)))
-        class_total = list(0. for i in range(len(self.classifier.classes)))
+        class_correct = list(0. for i in range(len(self.classifier.class_to_idx.keys())))
+        class_total = list(0. for i in range(len(self.classifier.class_to_idx.keys())))
 
-        test_model = self.selected_model.to(self.device)
 
-        with torch.no_grad():
-            test_model.eval()
-            for idx, data, target in self.classifier.loaders['test']:
-                data, target = data.to(self.device), target.to(self.device)
-                output = test_model(data)
-                loss = self.classifier.criterion(output, target)
-                test_loss += loss.item()*data.size(0)
-                _, pred = torch.max(output, 1)
-                correct = np.squeeze(pred.eq(target.data.view_as(pred)))
-                for i in range(data.shape[0]):
-                    label = target.data[i]
-                    class_correct[label] += correct[i].item()
-                    class_total[label] += 1
+        if self.classifier.classifier_type == 'torch':
+            with torch.no_grad():
+                self.selected_model.eval()
+                for idx, imgs, labels in self.classifier.loaders[target_loader]:
+                    imgs, labels = imgs.to(self.device), labels.to(self.device)
+                    output = self.selected_model(imgs)
+                    loss = self.classifier.criterion(output, labels)
+                    test_loss += loss.item()*imgs.size(0)
+                    _, pred = torch.max(output, 1)
+                    correct = np.squeeze(pred.eq(labels.data.view_as(pred)))
+                    for i in range(imgs.shape[0]):
+                        label = labels.data[i]
+                        class_correct[label] += correct[i].item()
+                        class_total[label] += 1
 
-            test_loss = test_loss/len(self.classifier.loaders['test'].dataset)
-            print('Overall Test Loss: {:.6f}\n'.format(test_loss))
+                test_loss = test_loss/len(self.classifier.loaders['test'].dataset)
+                print('Overall Test Loss: {:.6f}\n'.format(test_loss))
 
-            for i in range(len(self.classifier.classes)):
-                c = next((k for k, v in self.classifier.classes.items() if v == i), None)
-                if class_total[i] > 0:
-                    print('Test Accuracy of %5s: %2d%% (%2d/%2d)' % (
-                        c , 100 * class_correct[i] / class_total[i],
-                        np.sum(class_correct[i]), np.sum(class_total[i])))
 
-                else:
-                    print('Test Accuracy of %5s: N/A (no training examples)' % (c))
+        elif  self.classifier.classifier_type == 'sklearn':
+            true_labels, predictions = self.get_predictions(target_loader=target_loader)
+            true_labels = torch.LongTensor(true_labels)
+            predictions = torch.FloatTensor(predictions)
+            correct = np.squeeze(predictions.eq(true_labels.data.view_as(predictions)))
+            for i in range(len(true_labels)):
+                label = true_labels.data[i]
+                class_correct[label] += correct[i].item()
+                class_total[label] += 1
 
-            print('\nTest Accuracy (Overall): %2d%% (%2d/%2d)' % (
-                100. * np.sum(class_correct) / np.sum(class_total),
-                np.sum(class_correct), np.sum(class_total)))
 
-            self.accuracy = 100. * np.sum(class_correct) / np.sum(class_total)
+        for i in range(len(self.classifier.class_to_idx)):
+            c = next((k for k, v in self.classifier.class_to_idx.items() if v == i), None)
+            if class_total[i] > 0:
+                print('Test Accuracy of %5s: %2d%% (%2d/%2d)' % (
+                    c , 100 * class_correct[i] / class_total[i],
+                    np.sum(class_correct[i]), np.sum(class_total[i])))
+
+            else:
+                print('Test Accuracy of %5s: N/A (no examples)' % (c))
+
+        print('\nTest Accuracy (Overall): %2d%% (%2d/%2d)' % (
+            100. * np.sum(class_correct) / np.sum(class_total),
+            np.sum(class_correct), np.sum(class_total)))
+
+
+        #
+        #
+        # with torch.no_grad():
+        #     test_model.eval()
+        #     for idx, data, target in self.classifier.loaders[target_loader]:
+        #         data, target = data.to(self.device), target.to(self.device)
+        #         output = test_model(data)
+        #
+        #         if self.classifier.classifier_type == 'torch':
+        #             loss = self.classifier.criterion(output, target)
+        #         elif
+        #         test_loss += loss.item()*data.size(0)
+        #         _, pred = torch.max(output, 1)
+        #         correct = np.squeeze(pred.eq(target.data.view_as(pred)))
+        #         for i in range(data.shape[0]):
+        #             label = target.data[i]
+        #             class_correct[label] += correct[i].item()
+        #             class_total[label] += 1
+        #
+        #     test_loss = test_loss/len(self.classifier.loaders['test'].dataset)
+        #     print('Overall Test Loss: {:.6f}\n'.format(test_loss))
+        #
+        #     for i in range(len(self.classifier.classes)):
+        #         c = next((k for k, v in self.classifier.classes.items() if v == i), None)
+        #         if class_total[i] > 0:
+        #             print('Test Accuracy of %5s: %2d%% (%2d/%2d)' % (
+        #                 c , 100 * class_correct[i] / class_total[i],
+        #                 np.sum(class_correct[i]), np.sum(class_total[i])))
+        #
+        #         else:
+        #             print('Test Accuracy of %5s: N/A (no training examples)' % (c))
+        #
+        #     print('\nTest Accuracy (Overall): %2d%% (%2d/%2d)' % (
+        #         100. * np.sum(class_correct) / np.sum(class_total),
+        #         np.sum(class_correct), np.sum(class_total)))
+
+            # self.accuracy = 100. * np.sum(class_correct) / np.sum(class_total)
 
     def confusion_matrix(self, target_loader='test', figure_size=(8,6), cmap='Blues', percent=False):
         #https://github.com/DTrimarchi10/confusion_matrix/blob/master/cf_matrix.py

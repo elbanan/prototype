@@ -23,6 +23,7 @@ from sklearn.utils import resample
 from torch.utils.model_zoo import load_url
 from torchinfo import summary
 from matplotlib import cm
+from datetime import datetime
 
 from .const import *
 
@@ -33,6 +34,10 @@ class Identity(nn.Module):
 
     def forward(self, x):
         return x
+
+def current_time():
+    dt_string = (datetime.now()).strftime("[%d-%m-%Y %H:%M:%S]")
+    return dt_string
 
 def find_classes(directory):
     classes = sorted(entry.name for entry in os.scandir(directory) if entry.is_dir())
@@ -291,3 +296,18 @@ def check_wl(WW, WL):
 def add_uid_column(df, length=10):
     df['uid'] = [int(str(uuid.uuid1().int)[:length]) for i in range (len(df)) ]
     return df
+
+def save_checkpoint(classifier, output_file):
+    if classifier.classifier_type == 'torch':
+        checkpoint = {'type':classifier.classifier_type,
+                      'model':classifier.best_model,
+                      'optimizer_state_dict' : classifier.optimizer.state_dict(),
+                      'train_losses': classifier.train_losses,
+                      'valid_losses': classifier.valid_losses,
+                      'valid_loss_min': classifier.valid_loss_min,}
+
+    elif classifier.classifier_type == 'sklearn':
+        checkpoint = {'type':classifier.classifier_type,
+                      'model':classifier.best_model}
+
+    torch.save(checkpoint, output_file)
