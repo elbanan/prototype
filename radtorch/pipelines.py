@@ -18,12 +18,10 @@ class ImageClassificationPipeline():
         self.classifier = ImageClassifier(model, dataset=self.dataset, feature_extractor_arch=model_arch, criterion=criterion, optimizer=optimizer)
 
 
-
     def fit(self, **kwargs):
         self.classifier.fit(**kwargs)
         self.metrics = Metrics(classifier=self.classifier, use_best=True)
         self.predictor = Inference(classifier=self.classifier)
 
-
-    def inference(img_path, top_predictions='all', display_image=False, human=True):
-        self.predictor.predict(img_path=img_path, top_predictions=top_predictions, display_image=display_image, human=human)
+    def export(self, output_file):
+        torch.save(self, output_file)
