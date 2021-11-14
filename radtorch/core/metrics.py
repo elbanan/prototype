@@ -43,14 +43,14 @@ class Metrics():
                 out = self.selected_model(imgs)
                 if self.classifier.classifier_type == 'torch':
                     if raw:
-                        pr = [i.tolist() for i in out]
+                        pr = [i.tolist() for i in out.cpu().numpy()]
                     else:
-                        pr = [(i.tolist()).index(max(i.tolist())) for i in out]
+                        pr = [(i.tolist()).index(max(i.tolist())) for i in out.cpu().numpy()]
                 elif self.classifier.classifier_type == 'sklearn':
                     if raw:
-                        pr = [i.tolist() for i in self.classifier.best_model.predict_proba(out)]
+                        pr = [i.tolist() for i in self.classifier.best_model.predict_proba(out.cpu().numpy())]
                     else:
-                        pr = [(i.tolist()).index(max(i.tolist())) for i in self.classifier.best_model.predict_proba(out)]
+                        pr = [(i.tolist()).index(max(i.tolist())) for i in self.classifier.best_model.predict_proba(out.cpu().numpy())]
 
                 pred_labels = pred_labels+pr
 
