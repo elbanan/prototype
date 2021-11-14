@@ -48,8 +48,6 @@ class Inference():
                 nn_output = self.feature_extractor.model(img)
                 img_features = pd.DataFrame(nn_output.cpu().numpy())
                 raw_pred = self.classifier.best_model.predict_proba(img_features)
-                print (raw_pred)
-
 
         elif self.classifier.classifier_type == 'torch':
             with torch.no_grad():
@@ -66,8 +64,6 @@ class Inference():
                 o = sorted(o, key = lambda i: i['prob'], reverse=True)[:top]
             s = s+1
             predictions.append(o)
-
-
 
 
         if display_image:

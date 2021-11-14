@@ -57,13 +57,10 @@ class Metrics():
         return true_labels, pred_labels
 
 
-
     def test(self, target_loader='test'):
-
         test_loss = 0.0
         class_correct = list(0. for i in range(len(self.classifier.class_to_idx.keys())))
         class_total = list(0. for i in range(len(self.classifier.class_to_idx.keys())))
-
 
         if self.classifier.classifier_type == 'torch':
             with torch.no_grad():
@@ -108,48 +105,9 @@ class Metrics():
         print('\nTest Accuracy (Overall): %2d%% (%2d/%2d)' % (
             100. * np.sum(class_correct) / np.sum(class_total),
             np.sum(class_correct), np.sum(class_total)))
-
-
-        #
-        #
-        # with torch.no_grad():
-        #     test_model.eval()
-        #     for idx, data, target in self.classifier.loaders[target_loader]:
-        #         data, target = data.to(self.device), target.to(self.device)
-        #         output = test_model(data)
-        #
-        #         if self.classifier.classifier_type == 'torch':
-        #             loss = self.classifier.criterion(output, target)
-        #         elif
-        #         test_loss += loss.item()*data.size(0)
-        #         _, pred = torch.max(output, 1)
-        #         correct = np.squeeze(pred.eq(target.data.view_as(pred)))
-        #         for i in range(data.shape[0]):
-        #             label = target.data[i]
-        #             class_correct[label] += correct[i].item()
-        #             class_total[label] += 1
-        #
-        #     test_loss = test_loss/len(self.classifier.loaders['test'].dataset)
-        #     print('Overall Test Loss: {:.6f}\n'.format(test_loss))
-        #
-        #     for i in range(len(self.classifier.classes)):
-        #         c = next((k for k, v in self.classifier.classes.items() if v == i), None)
-        #         if class_total[i] > 0:
-        #             print('Test Accuracy of %5s: %2d%% (%2d/%2d)' % (
-        #                 c , 100 * class_correct[i] / class_total[i],
-        #                 np.sum(class_correct[i]), np.sum(class_total[i])))
-        #
-        #         else:
-        #             print('Test Accuracy of %5s: N/A (no training examples)' % (c))
-        #
-        #     print('\nTest Accuracy (Overall): %2d%% (%2d/%2d)' % (
-        #         100. * np.sum(class_correct) / np.sum(class_total),
-        #         np.sum(class_correct), np.sum(class_total)))
-
             # self.accuracy = 100. * np.sum(class_correct) / np.sum(class_total)
 
-    def confusion_matrix(self, target_loader='test', figure_size=(8,6), cmap='Blues', percent=False):
-        #https://github.com/DTrimarchi10/confusion_matrix/blob/master/cf_matrix.py
+    def confusion_matrix(self, target_loader='test', figure_size=(8,6), cmap='Blues', percent=False): #https://github.com/DTrimarchi10/confusion_matrix/blob/master/cf_matrix.py
         true_labels, pred_labels = self.get_predictions(target_loader=target_loader)
         cm = metrics.confusion_matrix(true_labels, pred_labels)
         accuracy = np.trace(cm) / float(np.sum(cm))
@@ -164,12 +122,13 @@ class Metrics():
         plt.figure(figsize=figure_size)
         sns.set_style("darkgrid")
         if percent:
-            sns.heatmap(cm/np.sum(cm), annot=True, fmt='.2%', cmap=cmap, xticklabels=self.classifier.classes,yticklabels=self.classifier.classes, linewidths=1, linecolor='black')
+            sns.heatmap(cm/np.sum(cm), annot=True, fmt='.2%', cmap=cmap, xticklabels=self.classifier.class_to_idx.keys() ,yticklabels=self.classifier.class_to_idx.keys(), linewidths=1, linecolor='black')
         else:
-            sns.heatmap(cm, annot=True, cmap=cmap, xticklabels=self.classifier.classes,yticklabels=self.classifier.classes,  linewidths=1, linecolor='black')
+            sns.heatmap(cm, annot=True, cmap=cmap, xticklabels=self.classifier.class_to_idx.keys(),yticklabels=self.classifier.class_to_idx.keys(),  linewidths=1, linecolor='black')
         plt.ylabel('True label')
         plt.xlabel('Predicted label' + stats_text)
         plt.title('Confusion Matrix', fontweight='bold')
+
 
     def roc(self, target_loader= 'test', figure_size=(8,6)):
         true_labels, pred_labels = self.get_predictions(target_loader=target_loader)
