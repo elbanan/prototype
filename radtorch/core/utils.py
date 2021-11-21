@@ -35,6 +35,13 @@ class Identity(nn.Module):
     def forward(self, x):
         return x
 
+def select_device(device='auto'):
+    if device=='auto':
+        return torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    else:
+        return torch.device(device)
+
+
 def current_time():
     dt_string = (datetime.now()).strftime("[%d-%m-%Y %H:%M:%S]")
     return dt_string

@@ -2,12 +2,14 @@ from .core import *
 
 
 class ImageClassificationPipeline():
-    def __init__(self, root, model, model_arch=None,
+    def __init__(self, \
+        root, model, model_arch=None,
         ext='dcm', \
         label_table=None, path_col='img_path', label_col='img_label', \
         num_output_channels=1,transform=None, WW=None, WL=None, \
         split=None, \
-        ignore_zero_img=False, sample=False, train_balance=False, batch_size=16, output_subset='all', optimizer=None, criterion = None, ):
+        ignore_zero_img=False, sample=False, train_balance=False, \
+        batch_size=16, output_subset='all', optimizer=None, criterion = None,device='auto'):
 
         self.dataset = DICOMDataset(root=root, ext=ext, \
         label_table=label_table, path_col=path_col, \
@@ -15,7 +17,7 @@ class ImageClassificationPipeline():
         transform=transform, WW=WW, WL=WL, split=split, \
         ignore_zero_img=ignore_zero_img, sample=sample, train_balance=train_balance, batch_size=batch_size, output_subset=output_subset)
 
-        self.classifier = ImageClassifier(model, dataset=self.dataset, feature_extractor_arch=model_arch, criterion=criterion, optimizer=optimizer)
+        self.classifier = ImageClassifier(model, dataset=self.dataset, feature_extractor_arch=model_arch, criterion=criterion, optimizer=optimizer, device=device)
 
 
     def fit(self, **kwargs):
