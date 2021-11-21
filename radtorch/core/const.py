@@ -75,3 +75,9 @@ imagenet_std = (0.229, 0.224, 0.225) #https://github.com/pytorch/vision/issues/1
 
 norm_mean = (0.5, 0.5, 0.5)
 norm_std = (0.5, 0.5, 0.5)
+
+
+
+image_classification_pipe_allowed_keys = ['root', 'model', 'model_arch','ext','label_table','path_col','label_col','num_output_channels','transform','WW','WL','split','ignore_zero_img', 'sample', 'train_balance','batch_size', 'output_subset', 'optimizer', 'criterion','device']
+dataset_allowed_keys = ['root', 'ext','label_table','path_col','label_col','num_output_channels','transform','WW','WL','split','ignore_zero_img', 'sample', 'train_balance','batch_size', 'output_subset']
+classifier_allowed_keys = ['model', 'dataset', 'feature_extractor_arch', 'criterion', 'optimizer', 'device']
