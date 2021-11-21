@@ -4,7 +4,6 @@ from .utils import *
 class FeatureExtractor():
 
     def __init__(self, model_arch, dataset, subset='train'):
-
         self.dataset = dataset
         self.subset = subset
         self.model_arch = model_arch
