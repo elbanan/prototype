@@ -42,7 +42,7 @@ class FeatureExtractor():
 
     def plot_features(self, annotations=False, figure_size=(10,10), cmap="YlGnBu"):
         plt.figure(figsize=figure_size)
-        plt.title("Average Rating of Games Across All Platforms")
+        plt.title("Extracted Features")
         sns.heatmap(data=self.features, annot=annotations,cmap=cmap);
 
     def model_info(self):
