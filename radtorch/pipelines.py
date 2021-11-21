@@ -2,22 +2,15 @@ from .core import *
 
 
 class ImageClassificationPipeline():
-    def __init__(self, \
-        root, model, model_arch=None,
-        ext='dcm', \
-        label_table=None, path_col='img_path', label_col='img_label', \
-        num_output_channels=1,transform=None, WW=None, WL=None, \
-        split=None, \
-        ignore_zero_img=False, sample=False, train_balance=False, \
-        batch_size=16, output_subset='all', optimizer=None, criterion = None,device='auto'):
+    def __init__(self, **kwargs):
 
-        self.dataset = DICOMDataset(root=root, ext=ext, \
-        label_table=label_table, path_col=path_col, \
-        label_col=label_col, num_output_channels=num_output_channels, \
-        transform=transform, WW=WW, WL=WL, split=split, \
-        ignore_zero_img=ignore_zero_img, sample=sample, train_balance=train_balance, batch_size=batch_size, output_subset=output_subset)
+        pipeline_allowed_keys = ['root', 'model', 'model_arch','ext','label_table','path_col','label_col','num_output_channels','transform','WW','WL','split','ignore_zero_img', 'sample', 'train_balance','batch_size', 'output_subset', 'optimizer', 'criterion','device']
+        dataset_allowed_keys = ['root', 'ext','label_table','path_col','label_col','num_output_channels','transform','WW','WL','split','ignore_zero_img', 'sample', 'train_balance','batch_size', 'output_subset']
+        classifier_allowed_keys = ['model', 'dataset', 'feature_extractor_arch', 'criterion', 'optimizer', 'device']
 
-        self.classifier = ImageClassifier(model, dataset=self.dataset, feature_extractor_arch=model_arch, criterion=criterion, optimizer=optimizer, device=device)
+        self.__dict__.update((k, v) for k, v in kwargs.items() if k in pipeline_allowed_keys)
+        self.dataset = DICOMDataset(**{k:v for k, v in self.__dict__.items() if k in dataset_allowed_keys})
+        self.classifier = ImageClassifier(**{k:v for k, v in self.__dict__.items() if k in classifier_allowed_keys})
 
 
     def fit(self, **kwargs):

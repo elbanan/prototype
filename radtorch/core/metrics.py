@@ -33,7 +33,7 @@ class Metrics():
         else:
             self.selected_model = self.classifier.feature_extractors['train'].model
 
-        for i, (idx, imgs, labels) in tqdm(enumerate(self.classifier.loaders[target_loader]), total=len(self.classifier.loaders[target_loader])):
+        for i, (idx, imgs, labels) in tqdm(enumerate(self.classifier.dataset.loaders[target_loader]), total=len(self.classifier.dataset.loaders[target_loader])):
             imgs, labels = imgs.to(self.device), labels.to(self.device)
             true_labels = true_labels+labels.tolist()
 
@@ -59,13 +59,13 @@ class Metrics():
 
     def test(self, target_loader='test'):
         test_loss = 0.0
-        class_correct = list(0. for i in range(len(self.classifier.class_to_idx.keys())))
-        class_total = list(0. for i in range(len(self.classifier.class_to_idx.keys())))
+        class_correct = list(0. for i in range(len(self.classifier.dataset.class_to_idx.keys())))
+        class_total = list(0. for i in range(len(self.classifier.dataset.class_to_idx.keys())))
 
         if self.classifier.classifier_type == 'torch':
             with torch.no_grad():
                 self.selected_model.eval()
-                for idx, imgs, labels in self.classifier.loaders[target_loader]:
+                for idx, imgs, labels in self.classifier.dataset.loaders[target_loader]:
                     imgs, labels = imgs.to(self.device), labels.to(self.device)
                     output = self.selected_model(imgs)
                     loss = self.classifier.criterion(output, labels)
@@ -77,7 +77,7 @@ class Metrics():
                         class_correct[label] += correct[i].item()
                         class_total[label] += 1
 
-                test_loss = test_loss/len(self.classifier.loaders['test'].dataset)
+                test_loss = test_loss/len(self.classifier.dataset.loaders['test'].dataset)
                 print('Overall Test Loss: {:.6f}\n'.format(test_loss))
 
 
@@ -92,8 +92,8 @@ class Metrics():
                 class_total[label] += 1
 
 
-        for i in range(len(self.classifier.class_to_idx)):
-            c = next((k for k, v in self.classifier.class_to_idx.items() if v == i), None)
+        for i in range(len(self.classifier.dataset.class_to_idx)):
+            c = next((k for k, v in self.classifier.dataset.class_to_idx.items() if v == i), None)
             if class_total[i] > 0:
                 print('Test Accuracy of %5s: %2d%% (%2d/%2d)' % (
                     c , 100 * class_correct[i] / class_total[i],
@@ -122,9 +122,9 @@ class Metrics():
         plt.figure(figsize=figure_size)
         sns.set_style("darkgrid")
         if percent:
-            sns.heatmap(cm/np.sum(cm), annot=True, fmt='.2%', cmap=cmap, xticklabels=self.classifier.class_to_idx.keys() ,yticklabels=self.classifier.class_to_idx.keys(), linewidths=1, linecolor='black')
+            sns.heatmap(cm/np.sum(cm), annot=True, fmt='.2%', cmap=cmap, xticklabels=self.classifier.dataset.class_to_idx.keys() ,yticklabels=self.classifier.dataset.class_to_idx.keys(), linewidths=1, linecolor='black')
         else:
-            sns.heatmap(cm, annot=True, cmap=cmap, xticklabels=self.classifier.class_to_idx.keys(),yticklabels=self.classifier.class_to_idx.keys(),  linewidths=1, linecolor='black')
+            sns.heatmap(cm, annot=True, cmap=cmap, xticklabels=self.classifier.dataset.class_to_idx.keys(),yticklabels=self.classifier.dataset.class_to_idx.keys(),  linewidths=1, linecolor='black')
         plt.ylabel('True label')
         plt.xlabel('Predicted label' + stats_text)
         plt.title('Confusion Matrix', fontweight='bold')
