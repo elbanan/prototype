@@ -20,7 +20,6 @@ class ImageClassifier():
         else:
             self.classifier_type = 'torch'
 
-
     def info(self):
         info=pd.DataFrame.from_dict(({key:str(value) for key, value in self.__dict__.items()}).items())
         info.columns=['Property', 'Value']
@@ -31,9 +30,9 @@ class ImageClassifier():
                 pass
         return info
 
-    def fit(self, epochs=20, valid=True, verbose_level= ('epoch', 1), output_model='best_model.pt',):
+    def fit(self, **kwargs):
         if self.classifier_type == 'torch':
-            self.train_nn(epochs=epochs, valid=valid, verbose_level=verbose_level, output_model=output_model)
+            self.train_nn(**{k:v for k, v in kwargs.items() if k in ['epochs', 'valid', 'verbose_level', 'output_model' ]})
 
         elif self.classifier_type == 'sklearn':
             if hasattr(self, 'train_features'):
@@ -42,20 +41,16 @@ class ImageClassifier():
                 print (current_time(), 'Running Feature Extraction using model architecture', self.feature_extractors['train'].model_arch)
                 self.feature_extractors['train'].run()
                 self.train_features, self.train_labels = self.feature_extractors['train'].hybrid_table(sklearn_ready=True)
-            self.train_sklearn(output_model=output_model)
+            self.train_sklearn(**{k:v for k, v in kwargs.items() if k in ['output_model']})
 
-    def train_sklearn(self, **kwargs):
+    def train_sklearn(self, output_model='best_model.pt'):
         print (current_time(), "Starting model training on "+str(self.device))
         self.best_model = deepcopy(self.model)
         self.best_model.fit(self.train_features, self.train_labels)
-        save_checkpoint(classifier=self, output_file=kwargs['output_model'])
+        save_checkpoint(classifier=self, output_file=output_model)
         print (current_time(), 'Training completed successfully.')
 
-    def train_nn(self, **kwargs):
-        epochs=kwargs['epochs']
-        valid=kwargs['valid']
-        verbose_level=kwargs['verbose_level']
-        output_model=kwargs['output_model']
+    def train_nn(self, epochs=20, valid=True, verbose_level= ('epoch', 1), output_model='best_model.pt'):
 
         self.valid_loss_min = np.Inf
         print (current_time(), "Starting model training on "+str(self.device))
@@ -158,20 +153,16 @@ class ImageClassifier():
         if self.classifier_type == 'torch':
             plt.figure(figsize=figsize)
             sns.set_style("darkgrid")
-            if data == 'all':
-                p = sns.lineplot(data = self.train_logs)
-            else:
-                p = sns.lineplot(data = self.train_logs[data].tolist())
-
+            if data == 'all': p = sns.lineplot(data = self.train_logs)
+            else: p = sns.lineplot(data = self.train_logs[data].tolist())
             p.set_xlabel("epoch", fontsize = 10)
             p.set_ylabel("loss", fontsize = 10);
-
         else:
             raise ValueError('Train Logs not available with sklearn classifiers.')
 
-    def export(self, path):
+    def export(self, output_file):
         try:
-            torch.save(self, path)
+            torch.save(self, output_file)
             print (current_time(), 'Export done successfully.')
         except:
             raise ValueError(current_time(), 'Cannot Export.')
