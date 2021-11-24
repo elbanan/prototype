@@ -130,19 +130,20 @@ class Metrics():
         plt.title('Confusion Matrix', fontweight='bold')
 
 
-    def roc(self, target_loader= 'test', figure_size=(8,6)):
+    def roc(self, target_loader= 'test', figure_size=(8,6), plot=True):
         true_labels, pred_labels = self.get_predictions(target_loader=target_loader)
         fpr, tpr, thresholds = metrics.roc_curve(true_labels, pred_labels)
         auc = metrics.roc_auc_score(true_labels, pred_labels)
-        sns.set_style("darkgrid")
-        fig = plt.figure(figsize=figure_size)
-        plt.plot([0, 0.5, 1.0], [0, 0.5, 1.0], linestyle=':')
-        plt.plot(fpr, tpr, linestyle='--', lw=1.1,  label = "ROC AUC = {:0.3f}".format(auc))
-        plt.xlabel('False Positive Rate (1-Specificity)')
-        plt.ylabel('True Positive Rate (Senstivity)')
-        plt.title('Receiver Operating Characteristic Curve',y=-0.2 , fontweight='bold')
-        plt.legend()
-        plt.show()
+        if plot:
+            sns.set_style("darkgrid")
+            fig = plt.figure(figsize=figure_size)
+            plt.plot([0, 0.5, 1.0], [0, 0.5, 1.0], linestyle=':')
+            plt.plot(fpr, tpr, linestyle='--', lw=1.1,  label = "ROC AUC = {:0.3f}".format(auc))
+            plt.xlabel('False Positive Rate (1-Specificity)')
+            plt.ylabel('True Positive Rate (Senstivity)')
+            plt.title('Receiver Operating Characteristic Curve',y=-0.2 , fontweight='bold')
+            plt.legend()
+            plt.show()
         self.auc = auc
 
     def all(self):
