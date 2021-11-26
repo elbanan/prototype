@@ -28,6 +28,8 @@ from datetime import datetime
 from .const import *
 
 
+###### GENERAL ######
+
 class Identity(nn.Module):
     def __init__(self):
         super(Identity, self).__init__()
@@ -41,10 +43,54 @@ def select_device(device='auto'):
     else:
         return torch.device(device)
 
-
 def current_time():
     dt_string = (datetime.now()).strftime("[%d-%m-%Y %H:%M:%S]")
     return dt_string
+
+def set_random_seed(seed):
+    try:
+        torch.manual_seed(seed)
+        np.random.seed(seed)
+        log('Random seed '+str(seed)+' set successfully')
+    except:
+        raise TypeError('Error. Could not set Random Seed. Please check again.')
+        pass
+
+def save_checkpoint(classifier, output_file):
+    if classifier.classifier_type == 'torch':
+        checkpoint = {'type':classifier.classifier_type,
+                      'model':classifier.best_model,
+                      'optimizer_state_dict' : classifier.optimizer.state_dict(),
+                      'train_losses': classifier.train_losses,
+                      'valid_losses': classifier.valid_losses,
+                      'valid_loss_min': classifier.valid_loss_min,}
+
+    elif classifier.classifier_type == 'sklearn':
+        checkpoint = {'type':classifier.classifier_type,
+                      'model':classifier.best_model}
+
+    torch.save(checkpoint, output_file)
+
+
+###### GRAPH ######
+
+def show_values_on_bars(axs):
+    #https://stackoverflow.com/a/51535326
+    def _show_on_single_plot(ax):
+        for p in ax.patches:
+            _x = p.get_x() + p.get_width() / 2
+            _y = p.get_y() + p.get_height()
+            value = int(p.get_height())
+            ax.text(_x, _y, value, ha="center")
+    if isinstance(axs, np.ndarray):
+        for idx, ax in np.ndenumerate(axs):
+            _show_on_single_plot(ax)
+    else:
+        _show_on_single_plot(axs)
+
+
+
+###### DATA ######
 
 def find_classes(directory):
     classes = sorted(entry.name for entry in os.scandir(directory) if entry.is_dir())
@@ -68,18 +114,6 @@ def id_to_path(df, root, id_col, path_col = 'img_path', ext='.dcm'):
     if root[-1] != '/' : root = root+'/'
     df[path_col] = [root+r[id_col]+ext for i,r in df.iterrows()]
     return df
-
-def create_seq_classifier(fc, i, l, o, batch_norm=True): #needs documentation
-    layers = {}
-    layers['fc0']= nn.Linear(i, l[0])
-    layers['r0']= nn.ReLU()
-    if batch_norm: layers['bn0']= nn.BatchNorm1d(l[0])
-    for i in range (0, len(l)-1):
-        layers['fc'+str(i+1)]= nn.Linear(l[i], l[i+1])
-        layers['r'+str(i+1)]= nn.ReLU()
-        if batch_norm: layers['bn'+str(i+1)]= nn.BatchNorm1d(l[i+1])
-    layers['fc'+ str(fc)]= nn.Linear(l[-1],o)
-    return nn.Sequential(OrderedDict([(k,v) for k, v in layers.items()]))
 
 def split_data(table, valid_percent=False, test_percent=False):
     num_train = len(table)
@@ -142,28 +176,6 @@ def dict_to_data(table_dict, **kwargs):
     class_to_idx = {cls_name: i for i, cls_name in enumerate(kwargs['classes'])}
     return data_table, classes, class_to_idx
 
-def init_w(m):
-    classname = m.__class__.__name__
-    if classname.find('Linear') != -1:
-        n = m.in_features
-        y = 1.0/np.sqrt(n)
-        m.weight.data.normal_(mean=0.0, std=y)
-        m.bias.data.fill_(0)
-
-def show_values_on_bars(axs):
-    #https://stackoverflow.com/a/51535326
-    def _show_on_single_plot(ax):
-        for p in ax.patches:
-            _x = p.get_x() + p.get_width() / 2
-            _y = p.get_y() + p.get_height()
-            value = int(p.get_height())
-            ax.text(_x, _y, value, ha="center")
-    if isinstance(axs, np.ndarray):
-        for idx, ax in np.ndenumerate(axs):
-            _show_on_single_plot(ax)
-    else:
-        _show_on_single_plot(axs)
-
 def calculate_mean_std(dataloader):
     '''
     Source
@@ -182,36 +194,6 @@ def calculate_mean_std(dataloader):
     mean /= nb_samples
     std /= nb_samples
     return (mean, std)
-
-def set_random_seed(seed):
-    try:
-        torch.manual_seed(seed)
-        np.random.seed(seed)
-        log('Random seed '+str(seed)+' set successfully')
-    except:
-        raise TypeError('Error. Could not set Random Seed. Please check again.')
-        pass
-
-def grab_pytorch_model(model_arch, pretrained):
-    model = eval('models.'+model_arch+ "()")
-    if pretrained:
-        state_dict = load_url(model_url[model_arch], progress=True)
-        model.load_state_dict(state_dict)
-    return model
-
-def remove_last_layers(model, model_arch):
-    if 'vgg' in model_arch: model.classifier = model.classifier[0]
-    elif 'resnet' in model_arch : model.fc = Identity()
-    elif 'alexnet' in model_arch: model.classifier = model.classifier[:2]
-    elif 'inception' in model_arch: model.fc = Identity()
-    return model
-
-def model_info(model, list=False, batch_size=1, channels=3, img_dim=224):
-    if isinstance(model, str): model = eval('models.'+model+ "()")
-    if list:
-        return list(model.named_children())
-    else:
-        return summary(model, input_size=(batch_size, channels, img_dim, img_dim), depth=channels, col_names=["input_size", "output_size", "num_params"],)
 
 def wl_array(array, WW, WL): #https://storage.googleapis.com/kaggle-forum-message-attachments/1010629/17014/convert_to_jpeg_for_kaggle.py
     upper, lower = WL+WW//2, WL-WW//2
@@ -302,17 +284,61 @@ def add_uid_column(df, length=10):
     df['uid'] = [int(str(uuid.uuid1().int)[:length]) for i in range (len(df)) ]
     return df
 
-def save_checkpoint(classifier, output_file):
-    if classifier.classifier_type == 'torch':
-        checkpoint = {'type':classifier.classifier_type,
-                      'model':classifier.best_model,
-                      'optimizer_state_dict' : classifier.optimizer.state_dict(),
-                      'train_losses': classifier.train_losses,
-                      'valid_losses': classifier.valid_losses,
-                      'valid_loss_min': classifier.valid_loss_min,}
 
-    elif classifier.classifier_type == 'sklearn':
-        checkpoint = {'type':classifier.classifier_type,
-                      'model':classifier.best_model}
+###### CLASSIFIER ######
 
-    torch.save(checkpoint, output_file)
+def create_seq_classifier(fc, i, l, o, batch_norm=True): #needs documentation
+    layers = {}
+    layers['fc0']= nn.Linear(i, l[0])
+    layers['r0']= nn.ReLU()
+    if batch_norm: layers['bn0']= nn.BatchNorm1d(l[0])
+    for i in range (0, len(l)-1):
+        layers['fc'+str(i+1)]= nn.Linear(l[i], l[i+1])
+        layers['r'+str(i+1)]= nn.ReLU()
+        if batch_norm: layers['bn'+str(i+1)]= nn.BatchNorm1d(l[i+1])
+    layers['fc'+ str(fc)]= nn.Linear(l[-1],o)
+    return nn.Sequential(OrderedDict([(k,v) for k, v in layers.items()]))
+
+def init_w(m):
+    classname = m.__class__.__name__
+    if classname.find('Linear') != -1:
+        n = m.in_features
+        y = 1.0/np.sqrt(n)
+        m.weight.data.normal_(mean=0.0, std=y)
+        m.bias.data.fill_(0)
+
+def grab_pytorch_model(model_arch, pretrained):
+    model = eval('models.'+model_arch+ "()")
+    if pretrained:
+        state_dict = load_url(model_url[model_arch], progress=True)
+        model.load_state_dict(state_dict)
+    return model
+
+def remove_last_layers(model, model_arch):
+    if 'vgg' in model_arch: model.classifier = model.classifier[0]
+    elif 'resnet' in model_arch : model.fc = Identity()
+    elif 'alexnet' in model_arch: model.classifier = model.classifier[:2]
+    elif 'inception' in model_arch: model.fc = Identity()
+    return model
+
+def model_info(model, list=False, batch_size=1, channels=3, img_dim=224):
+    if isinstance(model, str): model = eval('models.'+model+ "()")
+    if list:
+        return list(model.named_children())
+    else:
+        return summary(model, input_size=(batch_size, channels, img_dim, img_dim), depth=channels, col_names=["input_size", "output_size", "num_params"],)
+
+
+
+###### GAN ######
+
+def generate_noise(self, noise_size, noise_type, batch_size=25):
+    if noise_type =='normal':
+        noise = np.random.uniform(-1, 1, size=(batch_size, noise_size))
+    elif noise_type == 'gaussian':
+        noise = np.random.normal(0, 1, size=(batch_size, noise_size))
+    else:
+        log('Noise type not specified/recognized. Please check.')
+        pass
+    noise=torch.from_numpy(noise).float()
+    return noise
