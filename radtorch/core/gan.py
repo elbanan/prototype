@@ -164,15 +164,25 @@ class DCGAN():
 
         self.train_logs=pd.DataFrame({"d_loss": total_d_loss, "d_loss_real":d_real_loss, "d_loss_fake":d_fake_loss,  "g_loss" : total_g_loss})
 
-    def view_samples(self, epoch=-1, cmap='gray'):
-        fig, axes = plt.subplots(figsize=(16,4), nrows=2, ncols=8, sharey=True, sharex=True)
-        for ax, img in zip(axes.flatten(), self.samples[epoch]):
-            img = img.detach().cpu().numpy()
-            img = np.transpose(img, (1, 2, 0))
-            # img = ((img +1)*255 / (2)).astype(np.uint8) # rescale to pixel range (0-255)
-            ax.xaxis.set_visible(False)
-            ax.yaxis.set_visible(False)
-            im = ax.imshow(img.reshape((self.img_size,self.img_size,self.num_img_channels)), cmap=cmap)
+    def view_samples(self, epoch=-1, cmap='gray', num_images=8, figsize=(16,4)):
+        if isinstance(epoch, int):
+            fig, axes = plt.subplots(figsize=figsize, nrows=2, ncols=8, sharey=True, sharex=True)
+            for ax, img in zip(axes.flatten(), self.samples[epoch]):
+                img = img.detach().cpu().numpy()
+                img = np.transpose(img, (1, 2, 0))
+                ax.xaxis.set_visible(False)
+                ax.yaxis.set_visible(False)
+                im = ax.imshow(img.reshape((self.img_size,self.img_size,self.num_img_channels)), cmap=cmap)
+        else:
+          fig, axes = plt.subplots(figsize=figsize, nrows=len(epoch), ncols=8, sharey=True, sharex=True)
+          imgs = torch.cat([self.samples[i][:num_images] for i in epoch], 0)
+          for ax, img in zip(axes.flatten(), imgs):
+              img = img.detach().cpu().numpy()
+              img = np.transpose(img, (1, 2, 0))
+              ax.xaxis.set_visible(False)
+              ax.yaxis.set_visible(False)
+              im = ax.imshow(img.reshape((self.img_size,self.img_size,self.num_img_channels)), cmap=cmap)
+
 
     def view_train_logs(self, data='all', figsize=(12,8)):
         plt.figure(figsize=figsize)
