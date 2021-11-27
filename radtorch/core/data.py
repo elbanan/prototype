@@ -22,6 +22,8 @@ class DICOMDataset():
         self.ignore_zero_img = ignore_zero_img
         self.sample = sample
         self.train_balance=train_balance
+        self.batch_size = batch_size
+
 
         self.window, self.level = check_wl(WW, WL)
 
@@ -84,6 +86,7 @@ class DICOMDataset():
             self.transforms = {k:transforms.Compose([transforms.ToTensor()]) for k,v in self.data_table.items()}
 
         self.loaders = self.get_loaders(batch_size=batch_size, subset=output_subset)
+        self.img_size = self.loaders['train'].dataset[0][1].shape[1]
 
     def info(self):
         info=pd.DataFrame.from_dict(({key:str(value) for key, value in self.__dict__.items()}).items())

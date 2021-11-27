@@ -3,3 +3,4 @@ from .classifier import *
 from .feature_extractor import *
 from .inference import *
 from .metrics import *
+from .gan import *

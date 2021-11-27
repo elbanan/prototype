@@ -331,6 +331,10 @@ def model_info(model, list=False, batch_size=1, channels=3, img_dim=224):
 
 
 ###### GAN ######
+def get_img_dim(img_size, divisions):
+    for i in range(divisions):
+        img_size = img_size/2
+    return img_size
 
 def generate_noise(self, noise_size, noise_type, batch_size=25):
     if noise_type =='normal':
@@ -342,3 +346,22 @@ def generate_noise(self, noise_size, noise_type, batch_size=25):
         pass
     noise=torch.from_numpy(noise).float()
     return noise
+
+def conv_unit(in_channels, out_channels, kernel_size=4, stride=2, padding=1, batch_norm=True, leaky_relu=True):
+    layers = []
+    conv_layer = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding, bias=False)
+    layers.append(conv_layer)
+    if batch_norm:
+        layers.append(nn.BatchNorm2d(out_channels))
+    if leaky_relu:
+        return nn.LeakyReLU(nn.Sequential(*layers))
+    else:
+        return nn.Sequential(*layers)
+
+def deconv_unit(in_channels, out_channels, kernel_size=4, stride=2, padding=1, batch_norm=True):
+    layers = []
+    deconv_layer = nn.ConvTranspose2d(in_channels, out_channels,kernel_size, stride, padding, bias=False)
+    layers.append(deconv_layer)
+    if batch_norm:
+        layers.append(nn.BatchNorm2d(out_channels))
+    return nn.Sequential(*layers)

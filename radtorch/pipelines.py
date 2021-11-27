@@ -46,7 +46,7 @@ class CompareClassifiers(): #In Progress
         self.roc_auc_list = []
         if roc_auc:
 
-            for i in tqdm(self.metrics, total=len(self.metrics()):
+            for i in tqdm(self.metrics, total=len(self.metrics)):
                 print(current_time(), 'Calculating ROC AUC for trained models.' )
                 i.roc(plot=False)
                 self.roc_auc_list.append(i.auc)
