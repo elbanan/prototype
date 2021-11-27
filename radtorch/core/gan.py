@@ -2,7 +2,6 @@ from .utils import *
 from .data import *
 
 
-
 class DCGAN():
     def __init__(self, dataset,\
     noise_size, noise_type, device='auto', \
@@ -30,9 +29,12 @@ class DCGAN():
         self.discriminator = DCDiscriminator(input_img_size=self.img_size, num_input_channels= self.num_img_channels, conv_dim=conv_dim[0], num_conv=num_conv[0])
         self.generator = DCGenerator(noise_size=noise_size, conv_dim=conv_dim[1], output_img_size=self.img_size, num_output_channels= self.num_img_channels, num_tconv=num_conv[1])
         self.device = select_device(device)
-
-        self.discriminator_optimizer = optim.Adam(self.discriminator.parameters(), self.learning_rate[0], [self.beta1[0], self.beta2[0]])
-        self.generator_optimizer = optim.Adam(self.generator.parameters(), self.learning_rate[1], [self.beta1[1], self.beta2[1]])
+        if self.w_loss:
+          self.discriminator_optimizer=optim.RMSprop(self.discriminator.parameters(), lr=self.learning_rate[0])
+          self.generator_optimizer=optim.RMSprop(self.generator.parameters(), lr=self.learning_rate[1])
+        else:
+          self.discriminator_optimizer = optim.Adam(self.discriminator.parameters(), self.learning_rate[0], [self.beta1[0], self.beta2[0]])
+          self.generator_optimizer = optim.Adam(self.generator.parameters(), self.learning_rate[1], [self.beta1[1], self.beta2[1]])
 
     def generate_noise(self, size, type, batch_size):
         if type == 'normal': return torch.from_numpy(np.random.uniform(-1, 1, size=(batch_size, size))).float()
@@ -42,24 +44,28 @@ class DCGAN():
     def generate_fixed_samples(self, size):
         return self.generate_noise(size=self.noise_size, type=self.noise_type, batch_size=self.dataset.batch_size)
 
-    def calculate_real_loss(self, X, label_smooth=False):
+    def calculate_real_loss(self, X, device, label_smooth=False, w_loss=False):
         batch_size = X.size(0)
         if label_smooth:
             labels = torch.ones(batch_size)*label_smooth
+        elif w_loss:
+            labels = torch.ones(batch_size)*-1
         else:
             labels = torch.ones(batch_size)
         criterion = nn.BCEWithLogitsLoss()
-        loss = criterion(X.squeeze(), labels)
+        loss = criterion(X.squeeze(), labels.to(device))
         return loss
 
-    def calculate_fake_loss(self, X, label_smooth=False):
+    def calculate_fake_loss(self, X, device, label_smooth=False, w_loss=False):
         batch_size = X.size(0)
         if label_smooth:
             labels = torch.ones(batch_size)*label_smooth
+        elif w_loss:
+            labels = torch.ones(batch_size)
         else:
             labels=torch.zeros(batch_size)
         criterion = nn.BCEWithLogitsLoss()
-        loss = criterion(X.squeeze(), labels)
+        loss = criterion(X.squeeze(), labels.to(device))
         return loss
 
     def rescale_images(self, X, range=(-1,1)):
@@ -89,7 +95,7 @@ class DCGAN():
             discriminator_loss_fake= 0
 
             for i, (idx, real_images, labels) in enumerate(self.dataset.loaders['train']):
-                # real_images = self.rescale_images(real_images)
+                real_images = self.rescale_images(real_images)
                 real_images = real_images.to(self.device)
 
                 for r in range(self.train_ratio[0]):
@@ -97,18 +103,20 @@ class DCGAN():
                     self.discriminator_optimizer.zero_grad()
 
                     real_logits = self.discriminator(real_images)
-                    real_loss = self.calculate_real_loss(real_logits, label_smooth=self.label_smooth[0])
+                    real_loss = self.calculate_real_loss(real_logits, label_smooth=self.label_smooth[0], device=self.device, w_loss=self.w_loss)
 
                     # Train Discriminator on Real Images
                     noise = self.generate_noise(self.noise_size, self.noise_type, self.dataset.batch_size)
-                    fake_images = self.generator(noise)
+                    fake_images = self.generator(noise.to(self.device))
                     fake_logits = self.discriminator(fake_images)
-                    fake_loss = self.calculate_fake_loss(fake_logits,label_smooth=self.label_smooth[1])
+                    fake_loss = self.calculate_fake_loss(fake_logits,label_smooth=self.label_smooth[1], device=self.device, w_loss=self.w_loss)
 
                     # Total Discriminator loss
                     d_loss = real_loss + fake_loss
                     if self.w_loss:
-                        d_loss = torch.mean(real_logits) - torch.mean(real_logits)
+                        f = torch.mean(fake_logits.view(-1))
+                        r = torch.mean(real_logits.view(-1))
+                        d_loss = -(r-f)
                     d_loss.backward()
                     self.discriminator_optimizer.step()
 
@@ -119,11 +127,11 @@ class DCGAN():
                 for r in range(self.train_ratio[1]):
                 # Train Generator
                     self.generator_optimizer.zero_grad()
-                    g_fake_images = self.generator(noise)
+                    g_fake_images = self.generator(noise.to(self.device))
                     g_fake_logits = self.discriminator(g_fake_images)
-                    g_loss = self.calculate_real_loss(g_fake_logits) #flipped labels
+                    g_loss = self.calculate_real_loss(g_fake_logits, device=self.device, w_loss=self.w_loss) #flipped labels
                     if self.w_loss:
-                        g_loss = -torch.mean(g_fake_logits)
+                        g_loss = -torch.mean(g_fake_logits.view(-1))
 
                     g_loss.backward()
                     self.generator_optimizer.step()
@@ -144,7 +152,7 @@ class DCGAN():
             d_real_loss.append(epoch_d_real_loss)
             d_fake_loss.append(epoch_d_fake_loss)
 
-            print('Epoch [{:5d}/{:5d}] | d_loss: {:6.4f} | d_loss(real): {:6.4f} | d_loss(fake): {:6.4f} | g_loss: {:6.4f}'.format(
+            print('Epoch [{:5d}/{:5d}] | d_loss: {:6.5f} | d_loss(real): {:6.5f} | d_loss(fake): {:6.5f} | g_loss: {:6.5f}'.format(
                     e+1, epochs, epoch_d_loss, epoch_d_real_loss, epoch_d_fake_loss, epoch_g_loss))
 
             # Generate samples to view later
@@ -173,7 +181,6 @@ class DCGAN():
         else: p = sns.lineplot(data = self.train_logs[data].tolist())
         p.set_xlabel("epoch", fontsize = 10)
         p.set_ylabel("loss", fontsize = 10);
-
 
 
 class DCDiscriminator(nn.Module):
