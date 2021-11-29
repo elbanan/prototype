@@ -4,7 +4,7 @@ from .core import *
 class ImageClassificationPipeline():
     def __init__(self, **kwargs):
         self.__dict__.update((k, v) for k, v in kwargs.items() if k in image_classification_pipe_allowed_keys)
-        self.dataset = DICOMDataset(**{k:v for k, v in self.__dict__.items() if k in dataset_allowed_keys})
+        self.dataset = DICOMFileDataset(**{k:v for k, v in self.__dict__.items() if k in dataset_allowed_keys})
         self.classifier = ImageClassifier(**{k:v for k, v in self.__dict__.items() if k in classifier_allowed_keys})
 
     def fit(self, **kwargs):
@@ -18,7 +18,7 @@ class ImageClassificationPipeline():
 class CompareClassifiers(): #In Progress
     def __init__(self, **kwargs):
         self.__dict__.update((k, v) for k, v in kwargs.items() if k in image_classification_pipe_allowed_keys)
-        self.dataset = DICOMDataset(**{k:v for k, v in self.__dict__.items() if k in dataset_allowed_keys})
+        self.dataset = DICOMFileDataset(**{k:v for k, v in self.__dict__.items() if k in dataset_allowed_keys})
         self.classifiers = []
         sk_models = [{'model':i[0], 'feature_extractor_arch':i[1], 'type':'sklearn'} for i in list(itertools.product([i for i in self.model if str(type(i))[8:].startswith('sklearn')], self.feature_extractor_arch))]
         nn_models = [{'model':i, 'type':'nn'} for i in [i for i in self.model if not str(type(i))[8:].startswith('sklearn')]]

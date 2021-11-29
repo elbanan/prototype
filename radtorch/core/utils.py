@@ -24,6 +24,7 @@ from torch.utils.model_zoo import load_url
 from torchinfo import summary
 from matplotlib import cm
 from datetime import datetime
+from torchvision.utils import make_grid
 
 from .const import *
 

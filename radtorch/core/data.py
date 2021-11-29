@@ -1,21 +1,36 @@
 from .utils import *
 
 
+
+def show_stack(imgs, figsize):
+    if not isinstance(imgs, list):
+        imgs = [imgs]
+    fix, axs = plt.subplots(ncols=len(imgs), squeeze=False,figsize=figsize)
+    for i, img in enumerate(imgs):
+        img = img.detach()
+        img = torchvision.transforms.functional.to_pil_image(img)
+        axs[0, i].imshow(np.asarray(img))
+        axs[0, i].set(xticklabels=[], yticklabels=[], xticks=[], yticks=[])
+
+
 class DICOMDataset():
 
     def __init__(
-    self, root, ext='dcm', \
-    label_table=None, path_col='img_path', \
-    label_col='img_label', num_output_channels=1, \
-    transform=None, WW=None, WL=None, split=None, \
+    self, root, ext='dcm', type='file', \
+    label_table=None, path_col='path', study_col='study_id', \
+    label_col='label', num_output_channels=1, \
+    transform=False, WW=None, WL=None, split=None, \
     ignore_zero_img=False, sample=False, train_balance=False, batch_size=16, output_subset='all'):
+
 
         if root.endswith('/'):self.root = root
         else: self.root = root+'/'
 
         self.ext = ext
+        self.type=type
         self.label_col = label_col
         self.path_col = path_col
+        self.study_col=study_col
         self.num_output_channels=num_output_channels
 
         self.idx = {}
@@ -28,7 +43,7 @@ class DICOMDataset():
         self.window, self.level = check_wl(WW, WL)
 
 
-        if isinstance(label_table, dict):
+        if isinstance(label_table, dict): #NEEDS CHECK FOR DICOM DIRECTORY STRUCTURE
             self.data_table, self.classes, self.class_to_idx = dict_to_data(table_dict=label_table, classes=self.classes, label_col = self.label_col)
             for k,v in self.data_table:
                 v = add_uid_column(v, length=10)
@@ -41,11 +56,15 @@ class DICOMDataset():
                 self.class_to_idx =  {cls_name: i for i, cls_name in enumerate(self.classes)}
             else:
                 self.data_table = {}
-                self.classes, self.class_to_idx = find_classes(self.root)
-                table = root_to_data(root=self.root, ext=self.ext, path_col=self.path_col, label_col=self.label_col)
+                if self.type=='file':
+                    self.classes, self.class_to_idx = find_classes(self.root)
+                    table = root_to_data(root=self.root, ext=self.ext, path_col=self.path_col, label_col=self.label_col)
+                    if len(table) == 0:
+                        raise ValueError('No .{:} files were found in {:}. Please check.'.format(self.ext, self.root))
+                elif self.type=='directory':
+                    self.classes, self.class_to_idx, table = self.dicom_dir_to_table(self.root, self.ext)
 
-                if len(table) == 0:
-                    raise ValueError('No .{:} files were found in {:}. Please check.'.format(self.ext, self.root))
+
             if split:
                 self.valid_percent = split['valid']
                 if 'test' in split:
@@ -56,7 +75,6 @@ class DICOMDataset():
                         self.data_table[i] = table.loc[self.idx[i],:]
                         self.data_table[i] = add_uid_column(self.data_table[i], length=10)
                 else:
-                    # self.test_percent=None
                     self.train_percent = 1.0-self.valid_percent
                     self.idx['train'], self.idx['valid'] = self.split_data(table, valid_percent=self.valid_percent, test_percent=False)
                     for i in subsets[:2]:
@@ -68,8 +86,11 @@ class DICOMDataset():
 
 
         if self.ignore_zero_img:
-            for i in self.ignore_zero_img:
-                self.data_table[i] = check_zero_image(table=self.data_table[i], path_col=self.path_col)
+            if self.type != 'file':
+                raise ValueError('Ignore empty images feature is currently available with DICOMDatasets with "file" type.')
+            else:
+                for i in self.ignore_zero_img:
+                    self.data_table[i] = check_zero_image(table=self.data_table[i], path_col=self.path_col)
 
         if self.sample:
             for k, v in self.data_table.items():
@@ -80,13 +101,14 @@ class DICOMDataset():
 
         self.data_table['train'] = add_uid_column(self.data_table['train'], length=10)
 
-        if type(transform) is dict:
+        if isinstance(transform, dict):
             self.transforms = transform
         else:
             self.transforms = {k:transforms.Compose([transforms.ToTensor()]) for k,v in self.data_table.items()}
 
         self.loaders = self.get_loaders(batch_size=batch_size, subset=output_subset)
-        self.img_size = self.loaders['train'].dataset[0][1].shape[1]
+        if self.type == 'file':
+            self.img_size = self.loaders['train'].dataset[0][1].shape[1]
 
     def info(self):
         info=pd.DataFrame.from_dict(({key:str(value) for key, value in self.__dict__.items()}).items())
@@ -96,49 +118,61 @@ class DICOMDataset():
             except: pass
         return info
 
+    def dicom_dir_to_table(self, root, ext):
+        classes, class_to_idx = find_classes(root)
+        table = pd.DataFrame(columns=[self.study_col, self.path_col, 'num_images', self.label_col])
+        for c in classes:
+            study_dir = os.path.join(root, c)
+            study_idx = [x for x in os.walk(os.path.join(root, c))][0][1]
+            study_paths = [x[0] for x in os.walk(os.path.join(root, c))][1:]
+            for i in range(len(study_idx)):
+                table.loc[len(table.index)] = [study_idx[i], study_paths[i], len([file for file in glob.glob(study_paths[i]+"/"+ "**/*."+ext, recursive=True)]), c ]
+        return classes, class_to_idx, table
+
     def get_loaders(self, batch_size=16, shuffle=True, subset='all'):
         if subset == 'all':
             output = {}
             for k, v in self.data_table.items():
-                output[k] = DICOMProcessor(root=self.root, ext=self.ext, num_output_channels=self.num_output_channels, table=v, class_to_idx = self.class_to_idx, path_col=self.path_col, label_col=self.label_col, \
+                output[k] = DICOMProcessor(root=self.root, ext=self.ext, num_output_channels=self.num_output_channels, table=v, type=self.type, class_to_idx = self.class_to_idx, path_col=self.path_col, study_col=self.study_col, label_col=self.label_col, \
                 transform=self.transforms[k], window=self.window, level=self.level).get_loaders(batch_size=batch_size, shuffle=shuffle)
             return output
         else:
-            return {subset: DICOMProcessor(root=self.root, ext=self.ext, num_output_channels=self.num_output_channels, table=self.data_table[subset], class_to_idx = self.class_to_idx, path_col=self.path_col, label_col=self.label_col, \
+            return {subset: DICOMProcessor(root=self.root, ext=self.ext, num_output_channels=self.num_output_channels, table=self.data_table[subset], type=self.type, class_to_idx = self.class_to_idx, study_col=self.study_col, path_col=self.path_col, label_col=self.label_col, \
             transform=self.transforms[subset], window=self.window, level=self.level).get_loaders(batch_size=batch_size, shuffle=shuffle)}
 
-
-    def view_batch(self, data='train', figsize = (25,5), rows=2, batch_size=16, shuffle=True, num_images=None, cmap='gray'):
-        loader = DICOMProcessor(root=self.root, ext=self.ext, num_output_channels=self.num_output_channels, table=self.data_table[data], class_to_idx = self.class_to_idx, path_col=self.path_col, label_col=self.label_col, transform=self.transforms[data], \
+    def view_batch(self, data='train', figsize = (25,5), study_id=0, rows=2, batch_size=16, shuffle=True, num_images=False, cmap='gray'):
+        loader = DICOMProcessor(root=self.root, ext=self.ext, num_output_channels=self.num_output_channels, table=self.data_table[data], type=self.type, class_to_idx = self.class_to_idx, path_col=self.path_col, study_col=self.study_col, label_col=self.label_col, transform=self.transforms[data], \
         window=self.window, level=self.level).get_loaders(batch_size=batch_size, shuffle=shuffle)
-        uidx, images, labels  = (iter(loader)).next()
 
-        images = images.cpu().numpy()
-        labels = labels.cpu().numpy()
+        if self.type == 'file':
+            uidx, images, labels  = (iter(loader)).next()
+            images = images.cpu().numpy()
+            labels = labels.cpu().numpy()
+            batch = images.shape[0]
+            if num_images:
+                if num_images > batch:
+                    print('Warning: Selected number of images is less than batch size. Displaying a batch instead.')
+                else:
+                    batch = num_images
 
-        batch = images.shape[0]
+            fig = plt.figure(figsize=figsize)
+            for i in np.arange(batch):
+                ax = fig.add_subplot(rows, int(batch/rows), i+1, xticks=[], yticks=[])
+                if images[i].shape[0] == 3:
+                    ax.imshow(np.transpose(images[i], (1, 2, 0)), cmap=cmap)
+                elif images[i].shape[0] ==1:
+                    ax.imshow(np.squeeze(images[i]), cmap=cmap)
+                ax.set_title(self.classes[labels[i]])
+        elif self.type == 'directory':
+            imgs = loader.dataset[study_id][1]
+            if num_images:
+                imgs = imgs[:num_images]
+            grid = make_grid(imgs)
+            show_stack(grid, figsize)
 
-        if num_images:
-            if num_images > batch:
-                print('Warning: Selected number of images is less than batch size. Displaying a batch instead.')
-            else:
-                batch = num_images
-
-        fig = plt.figure(figsize=figsize)
-
-        for i in np.arange(batch):
-            ax = fig.add_subplot(rows, int(batch/rows), i+1, xticks=[], yticks=[])
-
-            if images[i].shape[0] == 3:
-                ax.imshow(np.transpose(images[i], (1, 2, 0)), cmap=cmap)
-
-            elif images[i].shape[0] ==1:
-                ax.imshow(np.squeeze(images[i]), cmap=cmap)
-
-            ax.set_title(self.classes[labels[i]])
 
     def view_multichannel_image(self, data='train', idx=0, figsize = (25,5), batch_size=16, shuffle=True, cmap='gray'):
-        loader = DICOMProcessor(root=self.root, ext=self.ext, table=self.data_table[data], class_to_idx = self.class_to_idx, path_col=self.path_col, label_col=self.label_col, transform=self.transforms[data], \
+        loader = DICOMProcessor(root=self.root, ext=self.ext, table=self.data_table[data], type='file', class_to_idx = self.class_to_idx, path_col=self.path_col, label_col=self.label_col, transform=self.transforms[data], \
         num_output_channels = self.num_output_channels, window=self.window, level=self.level).get_loaders(batch_size=batch_size, shuffle=shuffle)
         uidx, images, labels  = (iter(loader)).next()
 
@@ -209,10 +243,12 @@ class DICOMDataset():
         else:
             return df
 
+
 class DICOMProcessor(Dataset):
 
-    def __init__(self, root, ext='dcm', table=None, class_to_idx = None, path_col=None, label_col=None, transform=None, num_output_channels=1, window=None, level=None, split=None, ):
+    def __init__(self, root, ext='dcm', type='file', table=None, class_to_idx = None, path_col=None, label_col=None, study_col=None, transform=None, num_output_channels=1, window=None, level=None, split=None, ):
         self.ext = ext
+        self.type=type
         if root.endswith('/'):self.root = root
         else: self.root = root+'/'
         self.num_output_channels=num_output_channels
@@ -221,10 +257,13 @@ class DICOMProcessor(Dataset):
         self.class_to_idx = class_to_idx
 
         if path_col:self.path_col = path_col
-        else: self.path_col = 'img_path'
+        else: self.path_col = 'path'
 
         if label_col:self.label_col = label_col
-        else: self.label_col = 'img_label'
+        else: self.label_col = 'label'
+
+        if path_col:self.study_col = study_col
+        else: self.study_col = 'study_id'
 
         if isinstance(table, pd.DataFrame):
             self.table = table
@@ -234,18 +273,32 @@ class DICOMProcessor(Dataset):
                 self.classes = self.table[self.label_col].unique().tolist()
                 self.class_to_idx = {cls_name: i for i, cls_name in enumerate(self.classes)}
         else:
-            if self.class_to_idx:
-                self.classes = [k for k, v in self.class_to_idx.items()]
-            else:
-                self.classes, self.class_to_idx = find_classes(self.root)
-            self.table = root_to_data(root=self.root, ext=self.ext, path_col=self.path_col, label_col=self.label_col)
-            if len(self.table) == 0:
-                raise ValueError('No .{:} files were found in {:}. Please check.'.format(ext, self.root))
+            if self.type == 'file':
+                if self.class_to_idx:
+                    self.classes = [k for k, v in self.class_to_idx.items()]
+                else:
+                    self.classes, self.class_to_idx = find_classes(self.root)
+                self.table = root_to_data(root=self.root, ext=self.ext, path_col=self.path_col, label_col=self.label_col)
+                if len(self.table) == 0:
+                    raise ValueError('No .{:} files were found in {:}. Please check.'.format(ext, self.root))
+            elif self.type == 'directory':
+                self.classes, self.class_to_idx, self.table = self.dicom_dir_to_table(self.root, self.ext)
 
         if transform == None:
-            self.transforms = {'train': transforms.Compose([transforms.ToTensor()]), 'test':transforms.Compose([transforms.ToTensor()])}
+            self.transforms = transforms.Compose([transforms.ToTensor()])
         else:
             self.transforms = transform
+
+    def dicom_dir_to_table(self, root, ext):
+        classes, class_to_idx = find_classes(root)
+        table = pd.DataFrame(columns=[self.study_col, self.path_col, 'num_images', self.label_col])
+        for c in classes:
+            study_dir = os.path.join(root, c)
+            study_idx = [x for x in os.walk(os.path.join(root, c))][0][1]
+            study_paths = [x[0] for x in os.walk(os.path.join(root, c))][1:]
+            for i in range(len(study_idx)):
+                table.loc[len(table.index)] = [study_idx[i], study_paths[i], len([file for file in glob.glob(study_paths[i]+"/"+ "**/*."+ext, recursive=True)]), c ]
+        return classes, class_to_idx, table
 
     def info(self):
         info=pd.DataFrame.from_dict(({key:str(value) for key, value in self.__dict__.items()}).items())
@@ -256,21 +309,34 @@ class DICOMProcessor(Dataset):
         return len(self.table)
 
     def __getitem__(self, idx):
-        P = self.table.iloc[idx][self.path_col]
-        L = self.table.iloc[idx][self.label_col]
-        L_id = self.class_to_idx[L]
-        if self.ext != 'dcm':
-            img=Image.open(P)
-        else:
-            img = dicom_handler(img_path=P, num_output_channels=self.num_output_channels, WW=self.window, WL=self.level)
-        if self.transforms:
-            img=self.transforms(img)
+        path = self.table.iloc[idx][self.path_col]
+        label = self.table.iloc[idx][self.label_col]
+        label_id = self.class_to_idx[label]
+
+        if self.type == 'file':
+            if self.ext != 'dcm': img=Image.open(P)
+            else: img = dicom_handler(img_path=P, num_output_channels=self.num_output_channels, WW=self.window, WL=self.level)
+            if self.transforms: img=self.transforms(img)
+
+        elif self.type=='directory':
+            img_list = sorted([(file, float(pydicom.read_file(file).SliceLocation)) for file in glob.glob(path+"/"+  "**/*."+self.ext, recursive=True)],key=lambda x: x[1], reverse=True)
+            img_list = [i[0] for i in img_list]
+            img = [dicom_handler(img_path=i, num_output_channels=self.num_output_channels, WW=self.window, WL=self.level) for i in img_list]
+            if self.transforms:
+                img = [self.transforms(i) for i in img]
+                img = torch.stack(img)
+
         try:
             uid = self.table.iloc[idx]['uid']
         except:
-            # uid = P
             uid = self.table.index.values.tolist()[idx]
-        return  uid, img, L_id
+        return  uid, img, label_id
 
     def get_loaders(self, batch_size=16, shuffle=True):
         return torch.utils.data.DataLoader(self, batch_size=batch_size, shuffle=shuffle)
+
+
+
+
+# Allow to select subset of the CT stack
+# check 3 w/l on  CT stack
