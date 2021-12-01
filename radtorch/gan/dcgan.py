@@ -1,5 +1,6 @@
-from .utils import *
-from .data import *
+from ..core.utils import *
+from ..core.const import *
+from ..data import *
 
 
 class DCGAN():

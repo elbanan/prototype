@@ -1,4 +1,4 @@
-from .utils import *
+from ..core.utils import *
 from .metrics import *
 from .inference import *
 from .feature_extractor import *

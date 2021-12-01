@@ -1,4 +1,4 @@
-from .utils import *
+from ..core.utils import *
 
 
 class Inference():

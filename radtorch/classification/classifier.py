@@ -1,7 +1,8 @@
-from .utils import *
+from ..core.utils import *
+from ..core.const import *
 from .metrics import *
 from .inference import *
-from .feature_extractor import *
+from ..feature import *
 
 
 class ImageClassifier():

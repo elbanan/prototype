@@ -1,19 +1,7 @@
-from .core import *
+from ..core import *
+from ..data import *
+from ..classification import *
 
-
-class ImageClassificationPipeline():
-    def __init__(self, **kwargs):
-        self.__dict__.update((k, v) for k, v in kwargs.items() if k in image_classification_pipe_allowed_keys)
-        self.dataset = DICOMFileDataset(**{k:v for k, v in self.__dict__.items() if k in dataset_allowed_keys})
-        self.classifier = ImageClassifier(**{k:v for k, v in self.__dict__.items() if k in classifier_allowed_keys})
-
-    def fit(self, **kwargs):
-        self.classifier.fit(**kwargs)
-        self.metrics = Metrics(classifier=self.classifier, use_best=True)
-        self.inference = Inference(classifier=self.classifier)
-
-    def export(self, output_file):
-        torch.save(self, output_file)
 
 class CompareClassifiers(): #In Progress
     def __init__(self, **kwargs):
@@ -54,12 +42,3 @@ class CompareClassifiers(): #In Progress
         print(current_time(), 'Best Model id:', self.best_classifier_id )
         print(current_time(), 'Best Model:', self.classifier_table.iloc[self.best_classifier_id]['model'], 'with', self.classifier_table.iloc[self.best_classifier_id]['feature_extractor_arch'] )
         print(current_time(), 'Best Model ROC AUC:', max(self.roc_auc_list))
-
-
-
-
-
-## TO DO LIST
-# 1. resume training checkpoints
-# 2. CompareClassifiers
-# 3. GAN
