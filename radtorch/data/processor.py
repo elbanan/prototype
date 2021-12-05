@@ -3,6 +3,7 @@ from ..core.utils import *
 
 
 class DICOMProcessor(Dataset):
+
     def __init__(
         self,
         root,
@@ -127,7 +128,7 @@ class DICOMProcessor(Dataset):
                 img = Image.open(P)
             else:
                 img = dicom_handler(
-                    img_path=P,
+                    img_path=path,
                     num_output_channels=self.num_output_channels,
                     WW=self.window,
                     WL=self.level,
@@ -168,7 +169,3 @@ class DICOMProcessor(Dataset):
 
     def get_loaders(self, batch_size=16, shuffle=True):
         return torch.utils.data.DataLoader(self, batch_size=batch_size, shuffle=shuffle)
-
-
-# Allow to select subset of the CT stack
-# check 3 w/l on  CT stack

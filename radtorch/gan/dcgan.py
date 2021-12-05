@@ -3,6 +3,23 @@ from ..core.const import *
 from ..data import *
 
 
+
+
+def disc_output_img_size(input_img_size, num_conv):
+    for i in range(num_conv):
+        input_img_size = input_img_size/2
+        if input_img_size < 4:
+            raise ValueError('Cannot use this number of conv operations. Min conv final image size must be at least 4x4. Please use a smaller number of conv.')
+    return int(input_img_size)
+
+def gen_start_img_size(target_size, num_conv):
+    for i in range(num_conv):
+        target_size = target_size/2
+        if target_size < 4:
+            raise ValueError('Cannot use this number of t_conv operations. Starting image size must be at least 4x4. Please use a smaller number of t_conv.')
+    return int(target_size)
+
+
 class DCGAN():
     def __init__(self, dataset,\
     noise_size, noise_type, device='auto', \
@@ -21,7 +38,6 @@ class DCGAN():
         self.noise_size=noise_size
         self.num_img_channels = self.dataset.num_output_channels
         self.img_size = self.dataset.img_size
-        self.num_img_channels = self.dataset.num_output_channels
         self.learning_rate = learning_rate
         self.beta1=beta1
         self.beta2=beta2
@@ -184,7 +200,6 @@ class DCGAN():
               ax.yaxis.set_visible(False)
               im = ax.imshow(img.reshape((self.img_size,self.img_size,self.num_img_channels)), cmap=cmap)
 
-
     def view_train_logs(self, data='all', figsize=(12,8)):
         plt.figure(figsize=figsize)
         sns.set_style("darkgrid")
@@ -201,7 +216,7 @@ class DCDiscriminator(nn.Module):
         self.num_conv = num_conv
         self.conv_dim = conv_dim
         self.num_input_channels = num_input_channels
-        self.output_img_size = self.get_end_img_size(self.input_img_size, self.num_conv)
+        self.output_img_size = disc_output_img_size(self.input_img_size, self.num_conv)
 
         layers = [('conv0', self.conv_unit(in_channels=self.num_input_channels, out_channels=self.conv_dim, kernel_size=4, batch_norm=False, leaky_relu=True, dropout=0.5))]
 
@@ -210,13 +225,6 @@ class DCDiscriminator(nn.Module):
             conv_dim = conv_dim*2
         self.conv_layers = nn.Sequential(OrderedDict(layers))
         self.fc = nn.Linear(in_features=(self.conv_dim*(2**(self.num_conv-1))*self.output_img_size*self.output_img_size), out_features=1)
-
-    def get_end_img_size(self, input_img_size, num_conv):
-        for i in range(num_conv):
-            input_img_size = input_img_size/2
-            if input_img_size < 4:
-                raise ValueError('Cannot use this number of conv operations. Min conv final image size must be at least 4x4. Please use a smaller number of conv.')
-        return int(input_img_size)
 
     def conv_unit(self, in_channels, out_channels, kernel_size=4, stride=2, padding=1, batch_norm=True, leaky_relu=True, dropout=False):
         layers = []
@@ -242,17 +250,10 @@ class DCGenerator(nn.Module):
         self.output_img_size=output_img_size
         self.num_output_channels=num_output_channels
         self.num_tconv=num_tconv
-        self.start_img_size = self.get_start_img_size(self.output_img_size, self.num_tconv)
+        self.start_img_size = gen_start_img_size(self.output_img_size, self.num_tconv)
 
         self.fc = nn.Linear(in_features=self.noise_size, out_features=(self.conv_dim * (2**(self.num_tconv-1)) * self.start_img_size * self.start_img_size))
         self.t_conv_layers = self.create_tconv_seq()
-
-    def get_start_img_size(self, target_size, num_conv):
-        for i in range(num_conv):
-            target_size = target_size/2
-            if target_size < 4:
-                raise ValueError('Cannot use this number of t_conv operations. Starting image size must be at least 4x4. Please use a smaller number of t_conv.')
-        return int(target_size)
 
     def tconv_unit(self, in_channels, out_channels, kernel_size=4, stride=2, padding=1, batch_norm=True, relu=True):
         layers = [nn.ConvTranspose2d(in_channels, out_channels, kernel_size, stride, padding, bias=False)]

@@ -7,7 +7,7 @@ from ..classification import *
 class ImageClassificationPipeline():
     def __init__(self, **kwargs):
         self.__dict__.update((k, v) for k, v in kwargs.items() if k in image_classification_pipe_allowed_keys)
-        self.dataset = DICOMFileDataset(**{k:v for k, v in self.__dict__.items() if k in dataset_allowed_keys})
+        self.dataset = DICOMDataset(**{k:v for k, v in self.__dict__.items() if k in dataset_allowed_keys})
         self.classifier = ImageClassifier(**{k:v for k, v in self.__dict__.items() if k in classifier_allowed_keys})
 
     def fit(self, **kwargs):

@@ -204,6 +204,22 @@ def calculate_mean_std(dataloader):
     std /= nb_samples
     return (mean, std)
 
+def Normalize_0_1(Z):
+    return (Z - np.min(Z)) / (np.max(Z) - np.min(Z))
+
+def Normalize_255(array):
+    return (255*(array - np.min(array))/np.ptp(array)).astype(int)
+
+def Normalize_1_1(array):
+    return 2.*(array - np.min(array))/np.ptp(array)-1
+
+def add_uid_column(df, length=10):
+    df['uid'] = [int(str(uuid.uuid1().int)[:length]) for i in range (len(df)) ]
+    return df
+
+
+##### DICOM #####
+
 def wl_array(array, WW, WL): #https://storage.googleapis.com/kaggle-forum-message-attachments/1010629/17014/convert_to_jpeg_for_kaggle.py
     upper, lower = WL+WW//2, WL-WW//2
     X = np.clip(array.copy(), lower, upper)
@@ -214,19 +230,11 @@ def wl_array(array, WW, WL): #https://storage.googleapis.com/kaggle-forum-messag
 
 def dicom_to_hu(img_path):
     dcm_data = pydicom.read_file(img_path)
-    p = dcm_data.pixel_array
-    s = dcm_data.RescaleSlope
-    i = dcm_data.RescaleIntercept
-    return (p*s+i)
-
-def Normalize_0_1(array):
-    return (array - np.min(array)) / (np.max(array) - np.min(array))
-
-def Normalize_255(array):
-    return (255*(array - np.min(array))/np.ptp(array)).astype(int)
-
-def Normalize_1_1(array):
-    return 2.*(array - np.min(array))/np.ptp(array)-1
+    # p = dcm_data.pixel_array
+    # s = dcm_data.RescaleSlope
+    # i = dcm_data.RescaleIntercept
+    # return (p*s+i)
+    return (dcm_data.pixel_array*dcm_data.RescaleSlope+dcm_data.RescaleIntercept)
 
 def dicom_handler(img_path, num_output_channels=1, WW=None, WL=None):
 
@@ -240,9 +248,15 @@ def dicom_handler(img_path, num_output_channels=1, WW=None, WL=None):
         if num_output_channels == 1:
 
             if all(i!=None for i in [WW, WL]):
-                img = Image.fromarray(wl_array(array, WW, WL))
+                img = wl_array(array, WW, WL)
+                img = Normalize_0_1(img)
+                img = Image.fromarray(img)
+                # img = Image.fromarray(wl_array(array, WW, WL))
             else:
-                img = Image.fromarray(dicom_to_hu(img_path).astype('float32'), 'F')
+                img = dicom_to_hu(img_path).astype('float32')
+                img = Normalize_0_1(img)
+                img = Image.fromarray(img, 'F')
+                # img = Image.fromarray(dicom_to_hu(img_path).astype('float32'), 'F')
 
         elif num_output_channels == 3:
 
@@ -288,11 +302,6 @@ def check_wl(WW, WL):
         WW = [v['window'] for k, v in CT_window_level.items() if k in WW ]
         WL = [v['level'] for k, v in CT_window_level.items() if k in WL ]
     return WW, WL
-
-def add_uid_column(df, length=10):
-    df['uid'] = [int(str(uuid.uuid1().int)[:length]) for i in range (len(df)) ]
-    return df
-
 
 ###### CLASSIFIER ######
 

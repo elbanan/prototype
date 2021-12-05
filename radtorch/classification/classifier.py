@@ -16,8 +16,7 @@ class ImageClassifier():
         self.device = select_device(device)
 
         if str(type(model))[8:].startswith('sklearn'):
-            self.classifier_type = 'sklearn'
-            self.feature_extractors = {i:FeatureExtractor(model_arch=feature_extractor_arch, dataset=dataset, subset=i) for i in ['train', 'valid', 'test']}
+            self.classifier_type, self.feature_extractors = 'sklearn', {i:FeatureExtractor(model_arch=feature_extractor_arch, dataset=dataset, subset=i) for i in ['train', 'valid', 'test']}
         else:
             self.classifier_type = 'torch'
 
@@ -54,15 +53,22 @@ class ImageClassifier():
     def train_nn(self, epochs=20, valid=True, verbose_level= ('epoch', 1), output_model='best_model.pt'):
 
         self.valid_loss_min = np.Inf
+
         print (current_time(), "Starting model training on "+str(self.device))
+
         self.training_model = deepcopy(self.model)
+
         self.training_model = self.training_model.to(self.device)
+
         self.train_losses, self.valid_losses = [], []
+
         steps = 0
         verbose, print_every = verbose_level
+
         for e in tqdm(range(0,epochs)):
-            train_loss = 0
-            valid_loss = 0
+            epoch_train_loss = 0
+            epoch_valid_loss = 0
+
             #TRAIN MODEL
             self.training_model.train()
             for i, (idx, images, labels) in enumerate(self.dataset.loaders['train']):
@@ -73,14 +79,19 @@ class ImageClassifier():
                 loss = self.criterion(output, labels);
                 loss.backward();
                 self.optimizer.step();
-                train_loss += loss.item()*images.size(0)
-                if verbose == 'batch':
-                    if i % print_every == 0:
-                        print (current_time(),
-                              "Epoch: {:4}/{:4} |".format(e+1, epochs),
-                              "Batch: {:4}/{:4} |".format(i, len(self.dataset.loaders['train'])),
-                              "Train Loss:{:.5f} |".format(train_loss/len(self.dataset.loaders['train'].dataset))
-                              )
+                epoch_train_loss += loss.item()*images.size(0) #multiply the loss for the batch by the number of images in the batch
+
+                # if verbose == 'batch':
+                #     if i % print_every == 0:
+                #         print (current_time(),
+                #               "Epoch: {:4}/{:4} |".format(e+1, epochs),
+                #               "Batch: {:4}/{:4} |".format(i, len(self.dataset.loaders['train'])),
+                #               "Train Loss:{:.5f} |".format(epoch_train_loss)
+                #               )
+
+            epoch_train_loss = epoch_train_loss/len(self.dataset.loaders['train'].dataset)
+            self.train_losses.append(epoch_train_loss)
+
             #VALID MODEL
             if valid:
                 with torch.no_grad():
@@ -89,13 +100,12 @@ class ImageClassifier():
                         images, labels = images.to(self.device), labels.to(self.device)
                         output = self.training_model(images)
                         loss = self.criterion(output, labels)
-                        valid_loss += loss.item()*images.size(0)
-                self.train_losses.append(train_loss/len(self.dataset.loaders['train'].dataset))
-                self.valid_losses.append(valid_loss/len(self.dataset.loaders['valid'].dataset))
+                        epoch_valid_loss += loss.item()*images.size(0)
+                epoch_valid_loss = epoch_valid_loss/len(self.dataset.loaders['valid'].dataset)
+                self.valid_losses.append(epoch_valid_loss)
 
 
                 # SAVE MODEL IF VALID_LOSS IS DECREASING
-                epoch_valid_loss = valid_loss/len(self.dataset.loaders['valid'].dataset)
                 if epoch_valid_loss < self.valid_loss_min:
                     self.best_model = deepcopy(self.training_model)
                     self.valid_loss_min = epoch_valid_loss
@@ -111,8 +121,8 @@ class ImageClassifier():
                     if e % print_every == 0:
                         print (current_time(),
                                 "Epoch: {:4}/{:4} |".format(e, epochs),
-                                "Train Loss: {:.5f} |".format(train_loss/len(self.dataset.loaders['train'].dataset)),
-                                "Valid Loss: {:.5f} (best: {:.5f}) |".format(valid_loss/len(self.dataset.loaders['valid'].dataset),self.valid_loss_min),
+                                "Train Loss: {:.5f} |".format(epoch_train_loss),
+                                "Valid Loss: {:.5f} (best: {:.5f}) |".format(epoch_valid_loss,self.valid_loss_min),
                                 "Valid Loss dec: {:5} |".format(str(validation_decrease_status)),
                                 "Model saved: {:5} ".format(str(save_status)))
 
@@ -120,8 +130,8 @@ class ImageClassifier():
                     if verbose:
                         print (current_time(),
                               "Epoch: {:4}/{:4} |".format(e, epochs),
-                              "Train Loss :{:.5f} |".format(train_loss/len(self.dataset.loaders['train'].dataset)),
-                              "Valid Loss: {:.5f} (best: {:.5f}) |".format(valid_loss/len(self.dataset.loaders['valid'].dataset),self.valid_loss_min),
+                              "Train Loss :{:.5f} |".format(epoch_train_loss),
+                              "Valid Loss: {:.5f} (best: {:.5f}) |".format(epoch_valid_loss, self.valid_loss_min),
                               "Valid Loss dec: {:5} |".format(str(validation_decrease_status)),
                               "Model saved: {:5} ".format(str(save_status)))
 
@@ -130,13 +140,13 @@ class ImageClassifier():
                     if e % print_every == 0:
                         print (current_time(),
                                 "Epoch: {:4}/{:4} |".format(e, epochs),
-                                "Train Loss: {:.5f} |".format(train_loss/len(self.dataset.loaders['train'].dataset)))
+                                "Train Loss: {:.5f} |".format(epoch_train_loss))
 
                 else:
                     if verbose:
                         print (current_time(),
                               "Epoch: {:4}/{:4} |".format(e, epochs),
-                              "Train Loss :{:.5f} |".format(train_loss/len(self.dataset.loaders['train'].dataset)))
+                              "Train Loss :{:.5f} |".format(epoch_train_loss))
 
             if e+1 == epochs:
                 print (current_time(), 'Training Finished Successfully!')
