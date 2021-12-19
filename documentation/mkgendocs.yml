@@ -1,0 +1,9 @@
+pages:
+  - page: "Image Classification/classifier.md"
+    source: "~/Github/prototype/radtorch/classification/classifier.py"
+    functions:
+      - ImageClassifier
+      - info
+      - fit
+      - view_train_logs
+      - export

@@ -87,6 +87,18 @@ class ImageClassifier():
         print_every : int
             number of epochs to print training verbose. default=1. Only when training a pytorch nn model, otherwise ignored.
 
+            Explaining the verbose:
+
+            [19-12-2021 17:14:31] epoch:   0/  50 | t_loss: 0.80455 | v_loss: 0.82266 (best: 0.82266) | v_loss dec: True  | v_loss below target: False | model saved: False
+
+            [19-12-2021 17:14:31]: timestamp
+            epoch: current epoch/total epochs
+            t_loss: training loss
+            v_loss: validation loss (best achieved validation loss)
+            v_loss dec: True if validation loss is decreasing
+            v_loss below target: True if validation loss is below specified target value.
+            model saved: True if saved.
+
         target_valid_loss: float
             target validation loss below which the best model will be saved automatically. Every time the model's validation loss the saved model will be overriden. default = 'lowest' which automatically saves the trained model with lowest validation loss.  Only when training a pytorch nn model, otherwise ignored.
 

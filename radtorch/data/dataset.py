@@ -4,26 +4,109 @@ from .processor import *
 
 
 class DICOMDataset:
-    def __init__(
-        self,
-        root,
-        ext="dcm",
-        type="file",
-        label_table=None,
-        path_col="path",
-        study_col="study_id",
-        label_col="label",
-        num_output_channels=1,
-        transform=False,
-        WW=None,
-        WL=None,
-        split=None,
-        ignore_zero_img=False,
-        sample=False,
-        train_balance=False,
-        batch_size=16,
-        output_subset="all",
-    ):
+    """
+    DICOM Dataset class. This class is a container of all methods and functionalities needed to create `dataloaders` that will be used in the trainin process.
+    Its core is the `DICOMprocessor` which is an extension of pytorch `Dataset` class and utilizes pytorch with custom functions from `core` to handle dicom files.
+
+    Parameters
+    ----------
+
+    root: str
+        root/directory containing image files. If no label table is specified, classes and paths are extracted automatically as follows:
+
+        For `type` of "files", the expected directory structure should be:
+        Parent folder / class_1 / images
+                      / class_2 / images
+                      ....
+
+        For `type`of "directory", the expected directory structure should be:
+        Parent folder / class_1 / study_1 / images
+                      / class_1 / study_2 / images
+                      / class_2 / study_3 / images
+                      / class_2 / study_4 / images
+                      ....
+
+    ext: str
+        type/file extension of images. default='dcm'
+
+    type: str
+        type of dataset instances. either images 'files' or 'directory' as outlined above. default='file'.
+
+    label_table: (optional)
+
+    path_col: str
+        name of the table column containing the image path. default='path'.
+
+    label_col: str
+        name of the table column containing the image label. default='label'.
+
+    study_col: str
+        name of the table column containing the study id. default='study_id'.
+
+    transform: dictionary of pytorch transforms (optional)
+        dictionary of lists of pytorch transforms to be applied to images. default='False' which automatically transforms all images into tensors without extra transformations.
+        Expected dictionary follows the following structure:
+        transform = {
+            'train': transforms.Compose([.....]),
+            'valid': transforms.Compose([.....]),
+            'test': transforms.Compose([....]),
+        }
+        with 'valid' and 'test' being optional if dataset not splitted.
+
+        See https://pytorch.org/vision/stable/transforms.html
+
+    num_output_channels: int (optional)
+        number of expected image channels after transforms. default=1.
+        Notice: by default, most greyscale DICOM images have 1 channel and most pre-trained pytorch neural network models expect 3 channel input.
+
+    WW: int or list of int (optional)
+        value for DICOM window width. Number of integers must be equal to number of channels expected. default=None
+        See https://radiopaedia.org/articles/windowing-ct?lang=us
+
+    WL: int or list of int (optional)
+        value for DICOM window level. Number of integers must be equal to number of channels expected. default=None
+        See https://radiopaedia.org/articles/windowing-ct?lang=us
+
+    split: dict (optional)
+        dictionary of 'valid' and 'test' decimal/float to be used to split the data for training/testing. Accepts both 'valid' and 'test' or 'valid' only. default=None
+        e.g. split = {'valid': 0.2, 'test': 0.1}
+
+    ignore_zero_img: boolean (Optional)
+        option to ignore images containing all empty or 0-value pixel. default=False.
+
+    sample: int (optional)
+        option to use sample of the whole dataset. Useful for quick algorith testing with small portion of the main dataset. default=False.
+
+    train_balance: str (optional)
+        In case of imbalanced datasets where training classes have unequal number of images/studies, this gives the option to equalize the number of images/studies in `training` subset only.
+        This can be set to `upsample` or `downsample`. default=False.
+        See https://machinelearningmastery.com/random-oversampling-and-undersampling-for-imbalanced-classification/
+
+    batch_size: int
+        batch size for the generated dataloaders. default=16.
+
+    output_subset: str
+        dataloader to be generated. default='all' which generates all 'train', 'valid' and 'test'
+
+
+    Attributes
+    ----------
+    data_table: dict
+        dictionary of all generated data tables of 'train' and 'valid' and 'test' if exist.
+        Follows the sturcture: DICOMDataset.data_table = {'train': pandas dataframe, 'valid': pandas dataframe, 'test': pandas dataframe}
+
+    classes: list
+        list of generated classes/labels.
+
+    class_to_idx: dict
+        dictionary of generated classes/labels and their assigned numerical ids.
+
+    loaders: dict
+        dictionary containing the generated dataloaders following the structure: {'train': dataloader, 'valid': dataloader, 'test': dataloader}
+
+    """
+
+    def __init__(self,root,ext="dcm",type="file",label_table=None,path_col="path",study_col="study_id",label_col="label",num_output_channels=1,transform=False,WW=None,WL=None,split=None,ignore_zero_img=False,sample=False,train_balance=False,batch_size=16,output_subset="all"):
 
         if root.endswith("/"):
             self.root = root
@@ -148,6 +231,10 @@ class DICOMDataset:
             self.img_size = self.loaders["train"].dataset[0][1].shape[1]
 
     def info(self):
+        """
+        Returns class relevant information/parameters
+        """
+
         info = pd.DataFrame.from_dict(
             ({key: str(value) for key, value in self.__dict__.items()}).items()
         )
@@ -188,6 +275,25 @@ class DICOMDataset:
         return classes, class_to_idx, table
 
     def get_loaders(self, batch_size=16, shuffle=True, subset="all"):
+        """
+        Generates dataloaders from the DICOMDataset object.
+
+        Parameters
+        ----------
+        batch_size: int
+            batch size for the generated dataloaders. default=16.
+
+        shuffle: boolean
+            Shuffle images each with each use of dataloader.
+
+        subset: str
+            dataloader to be generated. default='all' which generates all 'train', 'valid' and 'test'.
+
+        Returns
+        -------
+        Dictionary of dataloaders from DICOMDataset object as :  {'train': dataloader, 'valid': dataloader, 'test': dataloader}
+        """
+
         if subset == "all":
             output = {}
             for k, v in self.data_table.items():
@@ -224,17 +330,40 @@ class DICOMDataset:
                 ).get_loaders(batch_size=batch_size, shuffle=shuffle)
             }
 
-    def view_batch(
-        self,
-        data="train",
-        figsize=(25, 5),
-        study_id=0,
-        rows=2,
-        batch_size=16,
-        shuffle=True,
-        num_images=False,
-        cmap="gray",
-    ):
+    def view_batch(self,data="train",figsize=(25, 5),study_id=0,rows=2,batch_size=16,shuffle=True,num_images=False,cmap="gray"):
+
+        """
+        Displays a batch or sample of batch of the DICOM dataset.
+
+        Parameters
+        ----------
+
+        data: str
+            dataloader subset to be displayed. default='train'
+
+        figsize: tuple
+            size of the output matplot figure. default=(25,5)
+
+        study_id: int
+            id of the study to be displayed. Only with DICOMDataset type = 'directory', otherwise ignored.
+
+        rows: int
+            number of rows. default=2.
+
+        batch_size: int
+            batch size, default=16.
+
+        shuffle: int
+            Shuffle images each with each use of dataloader.
+
+        num_images: int
+            number of images to be displayed. Useful when batch size is big and you want to display only a sample of a batch. default=False
+
+        cmap: str
+            color map for the generated figure. default = 'gray'. Please refer to https://matplotlib.org/stable/tutorials/colors/colormaps.html
+
+        """
+
         loader = DICOMProcessor(
             root=self.root,
             ext=self.ext,
@@ -280,15 +409,33 @@ class DICOMDataset:
             grid = make_grid(imgs)
             show_stack(grid, figsize)
 
-    def view_multichannel_image(
-        self,
-        data="train",
-        idx=0,
-        figsize=(25, 5),
-        batch_size=16,
-        shuffle=True,
-        cmap="gray",
-    ):
+    def view_multichannel_image(self,data="train",idx=0,figsize=(25, 5),batch_size=16,shuffle=True,cmap="gray"):
+        """
+        Displays different channels of a multi-channel image. Supports up to 3 channels for now.
+
+        Parameters
+        ----------
+
+        data: str
+            dataloader subset to be displayed. default='train'.
+
+        idx: int
+            index of the image to be displayed.
+
+        figsize: tuple
+            size of the output matplot figure. default=(25,5).
+
+        batch_size: int
+            batch size, default=16.
+
+        shuffle: int
+            Shuffle images each with each use of dataloader.
+
+        cmap: str
+            color map for the generated figure. default = 'gray'. Please refer to https://matplotlib.org/stable/tutorials/colors/colormaps.html
+
+        """
+
         loader = DICOMProcessor(
             root=self.root,
             ext=self.ext,
@@ -324,6 +471,23 @@ class DICOMDataset:
             ax.set_title("channel " + str(i))
 
     def header_info(self, data="train", limit=10):
+        """
+        Returns a table/pandas dataframe of DICOM header for all images in dataset/subset.
+
+        Parameters
+        ----------
+
+        data: str
+            dataloader subset to be displayed. default='train'
+
+        limit: int
+            limit of images/instances to include. default=10
+
+        Returns
+        -------
+        table/pandas dataframe of DICOM header for all images in dataset/subset.
+        """
+
         table = self.data_table[data]
         header_col = []
         for c in self.classes:
@@ -349,18 +513,8 @@ class DICOMDataset:
                 s += 1
         return df
 
-    def examine_img(
-        self,
-        data="train",
-        figure_size=(15, 15),
-        resize=(128, 128),
-        img_idx=0,
-        cmap="gray",
-    ):
-
-        img = pydicom.read_file(
-            self.data_table[data][self.path_col].tolist()[img_idx]
-        ).pixel_array
+    def examine_img(self,data="train",figure_size=(15, 15),resize=(128, 128),img_idx=0,cmap="gray"):
+        img = pydicom.read_file(self.data_table[data][self.path_col].tolist()[img_idx]).pixel_array
         img = cv2.resize(img, dsize=resize, interpolation=cv2.INTER_CUBIC)
         fig = plt.figure(figsize=figure_size)
         ax = fig.add_subplot(111)
@@ -379,6 +533,23 @@ class DICOMDataset:
                 )
 
     def data_stat(self, plot=False, figure_size=(8, 6)):
+        """
+        Displays different class distribution per subset.
+
+        Parameters
+        ----------
+        plot: boolean
+            True to display data statistics as figure. default=False
+
+        figure_size: tuple
+            size of the displayed figure. default=(8, 6)
+
+
+        Returns
+        -------
+        Padas dataframe if plot is set to False.
+        """
+
         d, c, i, n = [], [], [], []
         for k, v in self.data_table.items():
             for l, j in self.class_to_idx.items():
