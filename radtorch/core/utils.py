@@ -1,3 +1,4 @@
+
 import torch, torchvision, itertools, glob, os, pydicom, copy, cv2, uuid
 
 import numpy as np
@@ -56,21 +57,6 @@ def set_random_seed(seed):
     except:
         raise TypeError('Error. Could not set Random Seed. Please check again.')
         pass
-
-def save_checkpoint(classifier, output_file):
-    if classifier.classifier_type == 'torch':
-        checkpoint = {'type':classifier.classifier_type,
-                      'model':classifier.best_model,
-                      'optimizer_state_dict' : classifier.optimizer.state_dict(),
-                      'train_losses': classifier.train_losses,
-                      'valid_losses': classifier.valid_losses,
-                      'valid_loss_min': classifier.valid_loss_min,}
-
-    elif classifier.classifier_type == 'sklearn':
-        checkpoint = {'type':classifier.classifier_type,
-                      'model':classifier.best_model}
-
-    torch.save(checkpoint, output_file)
 
 
 ###### GRAPH ######
@@ -303,6 +289,7 @@ def check_wl(WW, WL):
         WL = [v['level'] for k, v in CT_window_level.items() if k in WL ]
     return WW, WL
 
+
 ###### CLASSIFIER ######
 
 def create_seq_classifier(fc, i, l, o, batch_norm=True): #needs documentation
@@ -346,7 +333,115 @@ def model_info(model, list=False, batch_size=1, channels=3, img_dim=224):
     else:
         return summary(model, input_size=(batch_size, channels, img_dim, img_dim), depth=channels, col_names=["input_size", "output_size", "num_params"],)
 
+def save_checkpoint(classifier, output_file, epochs=None, current_epoch=None):
+    if classifier.classifier_type == 'torch':
+        checkpoint = {'type':classifier.classifier_type,
+                      'model':classifier.training_model,
+                      'epochs':epochs,
+                      'checkpoint_epoch':current_epoch,
+                      'optimizer_state_dict' : classifier.optimizer.state_dict(),
+                      'train_losses': classifier.train_losses,
+                      'valid_losses': classifier.valid_losses,
+                      'valid_loss_min': classifier.valid_loss_min,}
 
+    elif classifier.classifier_type == 'sklearn':
+        checkpoint = {'type':classifier.classifier_type,
+                      'model':classifier.best_model}
+
+    torch.save(checkpoint, output_file)
+
+def train_sklearn(classifier, output_model='best_model.pt'):
+    print (current_time(), "Starting model training on "+str(classifier.device))
+    classifier.best_model = deepcopy(classifier.model)
+    classifier.best_model.fit(classifier.train_features, classifier.train_labels)
+    print (current_time(), 'Training completed successfully.')
+    save_checkpoint(classifier=classifier, output_file=output_model)
+    print (current_time(), 'Trained model saved successfully.')
+
+def train_nn(classifier, epochs=20, valid=True, print_every= 1, target_valid_loss='lowest', output_model='best_model.pt'):
+    print (current_time(), "Starting model training on "+str(classifier.device))
+    if target_valid_loss == 'lowest':
+        classifier.target_valid_loss = np.Inf
+    else:
+        classifier.target_valid_loss = target_valid_loss
+    classifier.valid_loss_min = np.Inf
+    print (current_time(), "Setting target validation loss to", classifier.target_valid_loss)
+    classifier.training_model = deepcopy(classifier.model)
+    classifier.training_model = classifier.training_model.to(classifier.device)
+    classifier.train_losses, classifier.valid_losses = [], []
+    steps = 0
+
+    for e in tqdm(range(0,epochs)):
+        epoch_train_loss = 0
+        epoch_valid_loss = 0
+
+        classifier.training_model.train()
+        for i, (idx, images, labels) in enumerate(classifier.dataset.loaders['train']):
+            steps += 1
+            images, labels = images.to(classifier.device), labels.to(classifier.device)
+            classifier.optimizer.zero_grad();
+            output = classifier.training_model(images);
+            loss = classifier.criterion(output, labels);
+            loss.backward();
+            classifier.optimizer.step();
+            epoch_train_loss += loss.item()*images.size(0) # multiply the loss for the batch by the number of instances in the batch
+        epoch_train_loss = epoch_train_loss/len(classifier.dataset.loaders['train'].dataset)
+        classifier.train_losses.append(epoch_train_loss)
+
+
+        if valid:
+            with torch.no_grad():
+                classifier.training_model.eval()
+                for ii, (idx, images, labels) in enumerate(classifier.dataset.loaders['valid']):
+                    images, labels = images.to(classifier.device), labels.to(classifier.device)
+                    output = classifier.training_model(images)
+                    loss = classifier.criterion(output, labels)
+                    epoch_valid_loss += loss.item()*images.size(0)
+            epoch_valid_loss = epoch_valid_loss/len(classifier.dataset.loaders['valid'].dataset)
+            classifier.valid_losses.append(epoch_valid_loss)
+
+
+            if epoch_valid_loss < classifier.valid_loss_min:
+                classifier.valid_loss_min = epoch_valid_loss
+                classifier.best_model = deepcopy(classifier.training_model)
+                if epoch_valid_loss <= classifier.target_valid_loss:
+                    save_checkpoint(classifier=classifier, epochs=epochs, current_epoch=e, output_file=output_model)
+                    save_status, v_dec, v_below_target = True, True, True
+                else:
+                    save_status, v_dec, v_below_target = False, True, False
+            else:
+                save_status, v_dec, v_below_target = False, False, False
+
+            if e % print_every == 0:
+                print (current_time(),
+                            "epoch: {:4}/{:4} |".format(e, epochs),
+                            "t_loss: {:.5f} |".format(epoch_train_loss),
+                            "v_loss: {:.5f} (best: {:.5f}) |".format(epoch_valid_loss,classifier.valid_loss_min),
+                            "v_loss dec: {:5} |".format(str(v_dec)),
+                            "v_loss below target: {:5} |".format(str(v_below_target)),
+                            "model saved: {:5} ".format(str(save_status)))
+
+        else:
+            if e % print_every == 0:
+                print (current_time(),
+                        "epoch: {:4}/{:4} |".format(e, epochs),
+                        "t_loss: {:.5f} |".format(epoch_train_loss))
+
+        if e+1 == epochs:
+            print (current_time(), 'Training Finished Successfully!')
+
+    if classifier.valid_loss_min > classifier.target_valid_loss:
+        print (current_time(), "CAUTION: Achieved minimum validation loss",classifier.valid_loss_min, "is not less than the set target loss of", classifier.target_valid_loss)
+
+
+    classifier.train_logs=pd.DataFrame({"train": classifier.train_losses, "valid" : classifier.valid_losses})
+
+def weight_init(x):
+    if x.classifier_type == 'torch':
+        x.model.apply(init_w)
+        print(current_time(), 'Model weight initialization applied successfully.')
+    else:
+        raise ValueError('Weight initialization not available with sklearn classifiers.')
 
 ###### GAN ######
 def get_img_dim(img_size, divisions):

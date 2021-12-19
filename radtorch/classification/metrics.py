@@ -1,6 +1,22 @@
+# 12/19/2021
+
 from ..core.utils import *
 
 class Metrics():
+    """
+    Container class for different metrics used for model/classifier evaluation.
+
+
+    Parameters
+    ----------
+
+    classifier : radtorch classifier object
+        a trained classifier object. Please see radtorch.classification.classifier
+
+    use_best : boolean
+        set to true to use the best trained version of the trained model. default = True. Only when training a pytorch nn model, otherwise ignored.
+
+    """
 
     def __init__(self, classifier, use_best=True):
 
@@ -19,7 +35,6 @@ class Metrics():
                 self.selected_model = self.classifier.training_model
         else:
             self.selected_model = self.classifier.feature_extractors['train'].model
-
 
     def get_predictions(self, target_loader, raw=False):
         true_labels = []
@@ -56,8 +71,21 @@ class Metrics():
 
         return true_labels, pred_labels
 
-
     def test(self, target_loader='test'):
+        """
+        Method to run inference on a specified test dataloader using the specified trained classifier.
+
+        Parameters
+        ----------
+        target_loader: str
+            name of the target dataloader to use to run the test. default='test'.
+
+        Returns
+        -------
+        This method prints accuracy for each class predictions as well as total model accuracy and overall test loss.
+
+        """
+
         test_loss = 0.0
         class_correct = list(0. for i in range(len(self.classifier.dataset.class_to_idx.keys())))
         class_total = list(0. for i in range(len(self.classifier.dataset.class_to_idx.keys())))
@@ -106,8 +134,31 @@ class Metrics():
             100. * np.sum(class_correct) / np.sum(class_total),
             np.sum(class_correct), np.sum(class_total)))
 
-
     def confusion_matrix(self, target_loader='test', figure_size=(8,6), cmap='Blues', percent=False): #https://github.com/DTrimarchi10/confusion_matrix/blob/master/cf_matrix.py
+        """
+        Method to generate confusion matrix using specified trained model and target dataloader.
+
+        Parameters
+        ----------
+
+        target_loader: str
+            name of the target dataloader to use to run the test. default='test'.
+
+        figure_size: tuple
+            size of the displayed graph. default=(8,6)
+
+        cmap: str
+            color map for the generated figure. default = 'Blues'. Please refer to https://matplotlib.org/stable/tutorials/colors/colormaps.html
+
+        percent: float
+            display cell values as percent not raw numbers. default=False.
+
+        Returns
+        -------
+        Matplotlib figure of the confusion matrix.
+
+        """
+
         true_labels, pred_labels = self.get_predictions(target_loader=target_loader)
         cm = metrics.confusion_matrix(true_labels, pred_labels)
         accuracy = np.trace(cm) / float(np.sum(cm))
@@ -129,11 +180,31 @@ class Metrics():
         plt.xlabel('Predicted label' + stats_text)
         plt.title('Confusion Matrix', fontweight='bold')
 
-
     def roc(self, target_loader= 'test', figure_size=(8,6), plot=True):
+        """
+        Method to generate ROC and ROC-AUC specified trained model and target dataloader.
+
+        Parameters
+        ----------
+
+        target_loader: str
+            name of the target dataloader to use to run the test. default='test'.
+
+        figure_size: tuple
+            size of the displayed graph. default=(8,6)
+
+        plot: boolean
+            display ROC curve or not. default=True. Useful to set to `False` if generating multiple ROC-AUC values for multiple models without the need to output the figure.
+
+        Returns
+        -------
+        Matplotlib figure of the ROC with ROC-AUC and evaluation metrics.
+        """
+
         true_labels, pred_labels = self.get_predictions(target_loader=target_loader)
         fpr, tpr, thresholds = metrics.roc_curve(true_labels, pred_labels)
         auc = metrics.roc_auc_score(true_labels, pred_labels)
+        self.auc = auc
         if plot:
             sns.set_style("darkgrid")
             fig = plt.figure(figsize=figure_size)
@@ -144,9 +215,17 @@ class Metrics():
             plt.title('Receiver Operating Characteristic Curve',y=-0.2 , fontweight='bold')
             plt.legend()
             plt.show()
-        self.auc = auc
+        else:
+            return auc
 
     def all(self):
+        """
+        Method to run multiple evaluation metrics at the same time.
+
+        Running this method will run the following methods: metrics.test(), metrics.confusion_matrix(), and metrics.roc()
+
+        """
+
         self.test()
         self.confusion_matrix()
         self.roc()

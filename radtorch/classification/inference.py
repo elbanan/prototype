@@ -1,7 +1,27 @@
+# 12/19/2021
+
 from ..core.utils import *
 
 
 class Inference():
+    """
+    Container class that contains all inference methods related to making predictions/inference using a trained model.
+
+
+    Parameters
+    ----------
+
+    classifier : radtorch classifier object
+        a trained classifier object. Please see radtorch.classification.classifier
+
+    specific_transform : pytorch nn transforms
+        List of specific pytorch transforms to be applied to images for inference.
+        If no specific tranforms are selected, the Inference class will try to use the specified `test` transforms of the dataset used for the classifier training.
+        If `test` transforms are not available, `train` transforms will be used instead.
+        if the model of the trained Classifier is an sklearn model, the Inference class will by default use the `train` transforms of the training dataset.
+
+    """
+
     def __init__(self, classifier=False, specific_transform=False):
 
         self.classifier = classifier
@@ -22,8 +42,41 @@ class Inference():
 
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-
     def predict(self, img_path, top_predictions='all', display_image=False, human=True):
+        """
+        Method to predict class/label of an image used a trained classifier.
+
+        Parameters
+        ----------
+
+        img_path : str
+            path to image to perfeorm inference operation on. Image type must be similar to image type used in original training set i.e. DICOM or non DICOM.
+
+        top_predictions : int
+            Number of top predictions to be returned. default='all'.
+
+        display_image : boolean
+            Either to display the image or not. default=False.
+
+        human : boolean
+            Display the predictions in human readable format. default=True.
+
+
+        Returns
+        -------
+        Only if human parameter = False.
+        This method will return a a list of predictions for each image supplied.
+        The predictions for each image will be in the form of list of dictionaries of each predictions as follows:
+        [
+            [ {'id':image1 id, 'class': class1 text, 'class__id':class1 id, 'prob': probability float},
+              {'id':image1 id, 'class': class2 text, 'class__id':class2 id, 'prob': probability float},...
+            ],
+            [ {'id':image2 id, 'class': class1 text, 'class__id':class1 id, 'prob': probability float},
+              {'id':image2 id, 'class': class2 text, 'class__id':class2 id, 'prob': probability float},...
+        ]
+
+        """
+
         if top_predictions == 'all':
             top = len(self.dataset.classes)
         else:

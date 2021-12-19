@@ -62,27 +62,17 @@ class DCGAN():
         return self.generate_noise(size=self.noise_size, type=self.noise_type, batch_size=self.dataset.batch_size)
 
     def calculate_real_loss(self, X, device, label_smooth=False, w_loss=False):
-        batch_size = X.size(0)
-        if label_smooth:
-            labels = torch.ones(batch_size)*label_smooth
-        elif w_loss:
-            labels = torch.ones(batch_size)*-1
-        else:
-            labels = torch.ones(batch_size)
         criterion = nn.BCEWithLogitsLoss()
-        loss = criterion(X.squeeze(), labels.to(device))
+        if label_smooth: loss = criterion(X, torch.ones_like(X)*label_smooth)
+        elif w_loss: loss = criterion(X, torch.ones_like(X)*-1)
+        else: loss = criterion(X, torch.ones_like(X))
         return loss
 
     def calculate_fake_loss(self, X, device, label_smooth=False, w_loss=False):
-        batch_size = X.size(0)
-        if label_smooth:
-            labels = torch.ones(batch_size)*label_smooth
-        elif w_loss:
-            labels = torch.ones(batch_size)
-        else:
-            labels=torch.zeros(batch_size)
         criterion = nn.BCEWithLogitsLoss()
-        loss = criterion(X.squeeze(), labels.to(device))
+        if label_smooth: loss = criterion(X, (torch.ones_like(X)*label_smooth).to(device))
+        elif w_loss: loss = criterion(X, (torch.ones_like(X)).to(device))
+        else: loss = criterion(X, (torch.zeros_like(X)).to(device))
         return loss
 
     def rescale_images(self, X, range=(-1,1)):
@@ -104,7 +94,11 @@ class DCGAN():
         self.generator.train()
         self.discriminator.train()
 
+        print (current_time(), "Starting model training on "+str(self.device))
+
+
         for e in tqdm(range(epochs), total=epochs):
+
 
             discriminator_loss = 0
             generator_loss = 0
@@ -180,6 +174,8 @@ class DCGAN():
                 self.generator.train()
 
         self.train_logs=pd.DataFrame({"d_loss": total_d_loss, "d_loss_real":d_real_loss, "d_loss_fake":d_fake_loss,  "g_loss" : total_g_loss})
+
+        print (current_time(), "Training completed successfully.")
 
     def view_samples(self, epoch=-1, cmap='gray', num_images=8, figsize=(16,4)):
         if isinstance(epoch, int):
